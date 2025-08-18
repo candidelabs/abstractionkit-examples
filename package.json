@@ -10,7 +10,7 @@
   },
   "license": "MIT",
   "dependencies": {
-    "abstractionkit": "^0.2.20",
+    "abstractionkit": "^0.2.30",
     "cbor": "^10.0.3",
     "dotenv": "^16.5.0"
   },
