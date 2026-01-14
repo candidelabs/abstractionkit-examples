@@ -2,7 +2,6 @@ import * as dotenv from 'dotenv'
 
 import {
     SafeMultiChainSigAccount as SafeAccount,
-    AllowAllPaymaster,
     MetaTransaction,
     getFunctionSelector,
     createCallData,
@@ -20,16 +19,15 @@ async function main(): Promise<void> {
     const nodeUrl2 = process.env.NODE_URL2 as string
     const ownerPublicAddress = process.env.PUBLIC_ADDRESS as string
     const ownerPrivateKey = process.env.PRIVATE_KEY as string
-
+    
     //initializeNewAccount only needed when the smart account
     //have not been deployed yet for its first useroperation.
     //You can store the accountAddress to use it to initialize 
     //the SafeAccount object for the following useroperations
     let smartAccount = SafeAccount.initializeNewAccount(
         [ownerPublicAddress],
-        {c2Nonce:12n}
+        {c2Nonce: 2n}
     )
-
     //After the account contract is deployed, no need to call initializeNewAccount
     //let smartAccount = new SafeAccount(accountAddress)
 
@@ -50,66 +48,47 @@ async function main(): Promise<void> {
         value: 0n,
         data: mintTransactionCallData,
     }
-     const transaction2: MetaTransaction = {
+
+    const transaction2: MetaTransaction = {
         to: nftContractAddress,
         value: 0n,
         data: mintTransactionCallData,
     }
     
-    const paymaster = new AllowAllPaymaster();
-    // fetching paymasterFieldsInitValues can be done concurrently
-    const [paymasterInitFields1, paymasterInitFields2]= await Promise.all(
-        [
-            paymaster.getPaymasterFieldsInitValues(chainId1),
-            paymaster.getPaymasterFieldsInitValues(chainId2),
-        ]
-    );
-
     // createUserOperation for useroperations can be done concurrently
     const [userOperation1, userOperation2]= await Promise.all(
         [
-            smartAccount.createUserOperation(
+            await smartAccount.createUserOperation(
                 [transaction1], nodeUrl1, bundlerUrl1,
                 {
-                    ...paymasterInitFields1,
                     preVerificationGasPercentageMultiplier: 100
                 }
             ),
-            smartAccount.createUserOperation(
+            await smartAccount.createUserOperation(
                 [transaction2], nodeUrl2, bundlerUrl2,
                 {
-                    ...paymasterInitFields2,
                     preVerificationGasPercentageMultiplier: 100
                 }
             ),
         ]
     );
 
-    // with ep0.09 the following operations can be done concurrently
-    // independant of each other to save time
-    // 1- the user signing
-    // 2- fetching the paymaster approval for each useroperation
-    const [signatures, paymasterData1, paymasterData2] = await Promise.all([
-        smartAccount.signUserOperations(
-            [
-                {
-                    userOperation: userOperation1,
-                    chainId: chainId1
-                },
-                {
-                    userOperation: userOperation2,
-                    chainId: chainId2
-                }
-            ],
-            [ownerPrivateKey],
-        ),
-        paymaster.getApprovedPaymasterData(userOperation1),
-        paymaster.getApprovedPaymasterData(userOperation2)
-    ]);
+    const signatures = smartAccount.signUserOperations(
+        [
+            {
+                userOperation: userOperation1,
+                chainId: chainId1
+            },
+            {
+                userOperation: userOperation2,
+                chainId: chainId2
+            }
+        ],
+        [ownerPrivateKey],
+    );
+
     userOperation1.signature = signatures[0];
     userOperation2.signature = signatures[1];
-    userOperation1.paymasterData = paymasterData1;
-    userOperation2.paymasterData = paymasterData2;
     
     // sendAndMonitorUserOperation for useroperations can be done concurrently
     await Promise.all(
