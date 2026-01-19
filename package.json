@@ -12,7 +12,8 @@
   "dependencies": {
     "abstractionkit": "^0.2.34",
     "cbor": "^10.0.3",
-    "dotenv": "^16.5.0"
+    "dotenv": "^16.5.0",
+    "viem": "^2.44.4"
   },
   "devDependencies": {
     "rimraf": "^5.0.10",
