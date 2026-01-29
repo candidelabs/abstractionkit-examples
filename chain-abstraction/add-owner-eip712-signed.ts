@@ -1,20 +1,25 @@
 /**
- * Add Owner Across Chains - Sign Once, Execute Everywhere
+ * Add Owner Across Chains - Wallet-Signed Version
  *
- * This example demonstrates Safe Unified Account's key value proposition:
- * adding a new owner across ALL chains with a SINGLE signature.
+ * This example demonstrates signing with an external wallet (EIP-712 typed data)
+ * instead of passing private keys directly to abstractionkit.
  *
- * Use Case: Adding a team member or backup key to your Safe on all chains.
- * You want the same owner added everywhere with guaranteed consistency.
+ * Use Case: Browser wallet integrations (MetaMask, WalletConnect), hardware
+ * wallets (Ledger, Trezor), or any scenario where you don't have direct
+ * access to the private key.
  *
- * Traditional approach: N chains = N signatures
- * Safe Unified Account: N chains = 1 signature
+ * Key difference from add-owner.ts:
+ * - Uses getMultiChainSingleSignatureUserOperationsEip712Data() to get typed data
+ * - Signs with viem's walletClient.signTypedData()
+ * - Uses formatSignaturesToUseroperationsSignatures() to format the result
  *
  * Learn more: https://docs.candide.dev/account-abstraction/research/safe-unified-account
  */
 
 import * as dotenv from 'dotenv'
+import { createWalletClient, http } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
+import { sepolia } from 'viem/chains'
 import {
     SafeMultiChainSigAccount as SafeAccount,
     AllowAllPaymaster,
@@ -32,7 +37,7 @@ async function main(): Promise<void> {
     const nodeUrl1 = process.env.NODE_URL1 as string
     const nodeUrl2 = process.env.NODE_URL2 as string
 
-    // Auto-generate keys if not provided (zero-setup for quick testing)
+    // Auto-generate keys if not provided
     const ownerPrivateKey = (process.env.PRIVATE_KEY || generatePrivateKey()) as `0x${string}`
     const ownerAccount = privateKeyToAccount(ownerPrivateKey)
     const ownerPublicAddress = process.env.PUBLIC_ADDRESS || ownerAccount.address
@@ -42,25 +47,23 @@ async function main(): Promise<void> {
     const newOwnerAddress = process.env.NEW_OWNER_ADDRESS || newOwnerAccount.address
 
     console.log("=".repeat(60))
-    console.log("ADD OWNER ACROSS CHAINS - SINGLE SIGNATURE DEMO")
+    console.log("ADD OWNER - WALLET-SIGNED (EIP-712) DEMO")
     console.log("=".repeat(60))
     console.log("\nOriginal owner:", ownerPublicAddress)
     console.log("New owner to add:", newOwnerAddress)
 
-    // Initialize SafeMultiChainSigAccount with c2Nonce for deterministic address
-    const smartAccount = SafeAccount.initializeNewAccount(
-        [ownerPublicAddress],
-    )
+    // Initialize Safe Unified Account
+    const smartAccount = SafeAccount.initializeNewAccount([ownerPublicAddress])
 
     console.log("\nSafe Account (same on both chains):", smartAccount.accountAddress)
     console.log("\nTarget chains:")
     console.log("  - Chain 1:", chainId1.toString())
     console.log("  - Chain 2:", chainId2.toString())
 
-    // Create add owner transaction (threshold = 1, any single owner can sign)
+    // Create add owner transaction
     const addOwnerTx = smartAccount.createStandardAddOwnerWithThresholdMetaTransaction(
         newOwnerAddress,
-        1 // threshold
+        1
     );
 
     // Set up AllowAllPaymaster for gas sponsorship
@@ -71,7 +74,7 @@ async function main(): Promise<void> {
         paymaster.getPaymasterFieldsInitValues(chainId2),
     ]);
 
-    console.log("\n[1/3] Creating UserOperations for both chains...")
+    console.log("\n[1/4] Creating UserOperations for both chains...")
 
     const [userOperation1, userOperation2] = await Promise.all([
         smartAccount.createUserOperation(
@@ -94,28 +97,64 @@ async function main(): Promise<void> {
         ),
     ]);
 
-    console.log("[2/3] Signing for BOTH chains with ONE signature...")
+    // Prepare the UserOperations to sign
+    const userOperationsToSign = [
+        { userOperation: userOperation1, chainId: chainId1 },
+        { userOperation: userOperation2, chainId: chainId2 }
+    ];
 
-    const [signatures, paymasterData1, paymasterData2] = await Promise.all([
-        smartAccount.signUserOperations(
-            [
-                { userOperation: userOperation1, chainId: chainId1 },
-                { userOperation: userOperation2, chainId: chainId2 }
-            ],
-            [ownerPrivateKey],
-        ),
+    console.log("[2/4] Getting EIP-712 typed data for signing...")
+
+    // Get EIP-712 typed data structure (instead of signing directly with private key)
+    const eip712Data = SafeAccount.getMultiChainSingleSignatureUserOperationsEip712Data(
+        userOperationsToSign
+    );
+
+    console.log("  Domain:", JSON.stringify(eip712Data.domain, bigIntReplacer))
+    console.log("  Primary type: MerkleTreeRoot")
+
+    console.log("[3/4] Signing with wallet (EIP-712 signTypedData)...")
+
+    // Create a wallet client (in a real app, this would be MetaMask, WalletConnect, etc.)
+    const walletClient = createWalletClient({
+        account: ownerAccount,
+        chain: sepolia,
+        transport: http()
+    });
+
+    // Sign the EIP-712 typed data
+    // In a browser, this would trigger a wallet popup
+    const signature = await walletClient.signTypedData({
+        domain: eip712Data.domain as Parameters<typeof walletClient.signTypedData>[0]['domain'],
+        types: eip712Data.types,
+        primaryType: 'MerkleTreeRoot',
+        message: eip712Data.messageValue as unknown as Record<string, unknown>
+    });
+
+    console.log("  Signature obtained:", signature.slice(0, 20) + "...")
+
+    // Format the single signature into per-UserOperation signatures
+    const signatures = SafeAccount.formatSignaturesToUseroperationsSignatures(
+        userOperationsToSign,
+        [{ signer: ownerPublicAddress, signature }]
+    );
+
+    console.log("  Formatted into", signatures.length, "UserOperation signatures")
+
+    // Apply signatures
+    userOperation1.signature = signatures[0];
+    userOperation2.signature = signatures[1];
+
+    // Get paymaster data
+    const [paymasterData1, paymasterData2] = await Promise.all([
         paymaster.getApprovedPaymasterData(userOperation1),
         paymaster.getApprovedPaymasterData(userOperation2)
     ]);
 
-    userOperation1.signature = signatures[0];
-    userOperation2.signature = signatures[1];
     userOperation1.paymasterData = paymasterData1;
     userOperation2.paymasterData = paymasterData2;
 
-    console.log("  Single signing operation generated", signatures.length, "signatures!")
-
-    console.log("[3/3] Submitting to both chains...")
+    console.log("[4/4] Submitting to both chains...")
 
     await Promise.all([
         sendAndMonitorUserOperation(userOperation1, bundlerUrl1, "Chain 1"),
@@ -140,7 +179,8 @@ async function main(): Promise<void> {
     const hasNewOwner2 = owners2.map(o => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
 
     if (hasNewOwner1 && hasNewOwner2) {
-        console.log("\nNew owner successfully added on BOTH chains with ONE signature!")
+        console.log("\nNew owner successfully added on BOTH chains!")
+        console.log("Signed with EIP-712 typed data (wallet-compatible).")
     }
 }
 
@@ -163,6 +203,11 @@ async function sendAndMonitorUserOperation(
     } else {
         console.log(`  [${chainName}] Execution failed`)
     }
+}
+
+// Helper to serialize BigInt values in JSON
+function bigIntReplacer(_key: string, value: unknown): unknown {
+    return typeof value === 'bigint' ? value.toString() : value;
 }
 
 main().catch(console.error)

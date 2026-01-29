@@ -53,6 +53,30 @@ Add a recovery guardian to your Safe accounts on multiple chains with ONE signat
 npx ts-node chain-abstraction/add-guardian.ts
 ```
 
+### 3. Add Owner - Wallet Signed (`add-owner-eip712-signed.ts`)
+
+Same as add-owner but uses EIP-712 typed data signing instead of passing private keys directly.
+
+**Use Case**: Browser wallet integrations (MetaMask, WalletConnect), hardware wallets (Ledger, Trezor), or any scenario where you don't have direct access to the private key.
+
+```bash
+npx ts-node chain-abstraction/add-owner-eip712-signed.ts
+```
+
+**Key difference**: Uses `getMultiChainSingleSignatureUserOperationsEip712Data()` to get typed data, then signs with viem's `walletClient.signTypedData()`.
+
+### 4. Add Owner - Passkey Signed (`add-owner-passkey.ts`)
+
+Same as add-owner but uses a passkey (WebAuthn) for signing.
+
+**Use Case**: Secure, phishing-resistant authentication using device biometrics (Face ID, Touch ID, Windows Hello) for cross-chain account management.
+
+```bash
+npx ts-node chain-abstraction/add-owner-passkey.ts
+```
+
+**Key difference**: Uses `getMultiChainSingleSignatureUserOperationsEip712Hash()` to get the hash, signs with WebAuthn, then formats with `formatSignaturesToUseroperationsSignatures()`.
+
 ## Configuration
 
 Copy `.env.example` to `.env` and configure the required variables. See the root `.env.example` for all available options.
@@ -109,4 +133,32 @@ await Promise.all([
     smartAccount.sendUserOperation(userOp1, bundlerUrl1),
     smartAccount.sendUserOperation(userOp2, bundlerUrl2),
 ]);
+```
+
+## Wallet-Signed Pattern (EIP-712)
+
+For browser wallets or hardware wallets, use the EIP-712 typed data approach:
+
+```typescript
+import { createWalletClient, http } from 'viem'
+
+// Get EIP-712 typed data (instead of signing with private key)
+const eip712Data = SafeAccount.getMultiChainSingleSignatureUserOperationsEip712Data([
+    { userOperation: userOp1, chainId: chainId1 },
+    { userOperation: userOp2, chainId: chainId2 }
+]);
+
+// Sign with wallet (triggers popup in browser)
+const signature = await walletClient.signTypedData({
+    domain: eip712Data.domain,
+    types: eip712Data.types,
+    primaryType: 'MerkleTreeRoot',
+    message: eip712Data.messageValue
+});
+
+// Format single signature into per-UserOperation signatures
+const signatures = SafeAccount.formatSignaturesToUseroperationsSignatures(
+    [{ userOperation: userOp1, chainId: chainId1 }, { userOperation: userOp2, chainId: chainId2 }],
+    [{ signer: ownerAddress, signature }]
+);
 ```

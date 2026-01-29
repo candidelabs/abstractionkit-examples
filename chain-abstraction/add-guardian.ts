@@ -20,9 +20,9 @@ import {
     SafeMultiChainSigAccount as SafeAccount,
     AllowAllPaymaster,
     SocialRecoveryModule,
-    SocialRecoveryModuleGracePeriodSelector
+    SocialRecoveryModuleGracePeriodSelector,
+    UserOperationV9,
 } from "abstractionkit";
-import { UserOperationV9 } from 'abstractionkit/dist/types';
 
 async function main(): Promise<void> {
     dotenv.config()
@@ -41,9 +41,7 @@ async function main(): Promise<void> {
     const ownerPublicAddress = process.env.PUBLIC_ADDRESS || ownerAccount.address
 
     // Generate guardian address (or use from env)
-    const guardianPrivateKey = generatePrivateKey()
-    const guardianAccount = privateKeyToAccount(guardianPrivateKey)
-    const guardianAddress = process.env.GUARDIAN_ADDRESS || guardianAccount.address
+    const guardianAddress = process.env.GUARDIAN_ADDRESS || privateKeyToAccount(generatePrivateKey()).address
 
     console.log("=".repeat(60))
     console.log("ADD GUARDIAN ACROSS CHAINS - SINGLE SIGNATURE DEMO")
@@ -62,8 +60,8 @@ async function main(): Promise<void> {
     console.log("  - Chain 2:", chainId2.toString())
 
     // Create SocialRecoveryModule instance
-    const gradePeriod3Minutes = SocialRecoveryModuleGracePeriodSelector.After3Minutes;
-    const srm = new SocialRecoveryModule(gradePeriod3Minutes)
+    const gracePeriod3Minutes = SocialRecoveryModuleGracePeriodSelector.After3Minutes;
+    const srm = new SocialRecoveryModule(gracePeriod3Minutes)
 
     // Create transactions to enable module and add guardian
     // These are the same for both chains
