@@ -11,7 +11,7 @@ Add this feature to the smart wallet: $ARGUMENTS
 | Multiple actions in one tx | `batch-transactions/batch-transactions.ts` |
 | Account recovery | `recovery/recovery.ts` |
 | EIP-7702 EOA upgrade | `eip-7702/upgrade-eoa-to-7702-smart-account.ts` |
-| Cross-chain operations | `chain-abstraction/` |
+| Multichain unified operations | `chain-abstraction/` |
 
 ## Step 2: Follow the Standard Pattern
 

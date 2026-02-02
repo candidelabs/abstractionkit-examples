@@ -28,6 +28,16 @@ PUBLIC_ADDRESS=<your-eoa-address>
 PRIVATE_KEY=<your-eoa-private-key>
 ```
 
+If using chain-abstraction examples
+```env
+BUNDLER_URL1=https://api.candide.dev/public/v3/11155111
+BUNDLER_URL2=https://api.candide.dev/public/v3/11155420
+NODE_URL1=https://ethereum-sepolia-rpc.publicnode.com
+NODE_URL2=https://sepolia.optimism.io
+CHAIN_ID1=11155111
+CHAIN_ID2=11155420
+```
+
 Run any example:
 ```bash
 npm install
@@ -46,7 +56,10 @@ npx ts-node <folder>/<script>.ts
 | Account recovery | `recovery/` | `recovery.ts` |
 | EIP-7702 delegation | `eip-7702/` | `upgrade-eoa-to-7702-smart-account.ts` |
 | Debug with Tenderly | `simulate-with-tenderly/` | `simulate-with-tenderly.ts` |
-| Cross-chain operations | `chain-abstraction/` | See README in folder |
+| Multichain-chain add owner | `chain-abstraction/` | `add-owner.ts` |
+| Multichain add guardian | `chain-abstraction/` | `add-guardian.ts` |
+| Multichain add owner (Eip-712 Wallet Signed) | `chain-abstraction/` | `add-owner-eip712-signed.ts` |
+| Multichain add owner (Passkey) | `chain-abstraction/` | `add-owner-passkey.ts` |
 | Nested Safe accounts | `nested-safe-accounts/` | `nested-safe-accounts.ts` |
 | Spending limits | `spend-permission/` | `spend-permission.ts` |
 
@@ -62,6 +75,13 @@ npx ts-node <folder>/<script>.ts
 | `PRIVATE_KEY` | Yes | Your EOA private key (becomes account owner) |
 | `SPONSORSHIP_POLICY_ID` | Optional | For custom sponsorship policies |
 | `TOKEN_ADDRESS` | For ERC-20 gas | Token to pay gas with |
+| `BUNDLER_URL1` | For chain-abstraction | ERC-4337 bundler endpoint |
+| `BUNDLER_URL2` | For chain-abstraction | ERC-4337 bundler endpoint |
+| `NODE_URL1` | For chain-abstraction | Chain 1 RPC endpoint |
+| `NODE_URL2` | For chain-abstraction | Chain 2 RPC endpoint |
+| `CHAIN_ID1` | For chain-abstraction | Target chain 1 (11155111 for Sepolia) |
+| `CHAIN_ID2` | For chain-abstraction | Target chain 2 (11155420 for OP Sepolia) |
+
 
 For production endpoints: https://dashboard.candide.dev
 
@@ -139,6 +159,7 @@ const receipt = await response.included();
 | `SafeAccountV0_3_0` | Most examples (recommended) | v0.7 |
 | `SafeAccountV0_2_0` | Legacy/v0.6 compatibility | v0.6 |
 | `Simple7702Account` | EIP-7702 delegation | v0.8 |
+| `SafeMultiChainSigAccount` | Chain abstraction (Safe Unified Account) | v0.9 |
 
 ## Common Commands
 
