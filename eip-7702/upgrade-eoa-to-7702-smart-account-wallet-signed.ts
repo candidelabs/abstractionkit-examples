@@ -62,7 +62,7 @@ async function main(): Promise<void> {
 
         const eip7702DelegationAuthorizationHash = createEip7702DelegationAuthorizationHash(
             chainId,
-            Simple7702Account.DEFAULT_DELEGATEE_ADDRESS,
+            smartAccount.delegateeAddress,
             BigInt(nonce)
         );
 
@@ -72,7 +72,7 @@ async function main(): Promise<void> {
 
         userOperation.eip7702Auth = {
             chainId: toBeHex(chainId),
-            address: Simple7702Account.DEFAULT_DELEGATEE_ADDRESS,
+            address: smartAccount.delegateeAddress,
             nonce: toBeHex(nonce),
             yParity: toBeHex(signedHash.yParity),
             r: signedHash.r,
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
 
         const userOperationHash = createUserOperationHash(
             userOperation,
-            Simple7702Account.DEFAULT_ENTRYPOINT_ADDRESS,
+            smartAccount.entrypointAddress,
             chainId,
         );
 
