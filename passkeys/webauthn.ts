@@ -175,7 +175,7 @@ export class WebAuthnCredentials {
 
     return {
       id: base64UrlEncode(credential.id),
-      rawId: ethers.getBytes(credential.id),
+      rawId: b2ab(ethers.getBytes(credential.id)),
       response: {
         clientDataJSON: b2ab(ethers.toUtf8Bytes(JSON.stringify(clientData))),
         attestationObject: b2ab(CBOR.encode(attestationObject)),
@@ -234,12 +234,12 @@ export class WebAuthnCredentials {
 
     return {
       id: base64UrlEncode(credential.id),
-      rawId: ethers.getBytes(credential.id),
+      rawId: b2ab(ethers.getBytes(credential.id)),
       response: {
         clientDataJSON: b2ab(ethers.toUtf8Bytes(JSON.stringify(clientData))),
         authenticatorData: b2ab(ethers.getBytes(authenticatorData)),
         signature: b2ab(signature.toDERRawBytes(false)),
-        userHandle: credential.user,
+        userHandle: b2ab(credential.user),
       },
       type: 'public-key',
     }
@@ -260,7 +260,7 @@ export function base64UrlEncode(data: BytesLike | ArrayBufferLike): string {
 }
 
 function b2ab(buf: Uint8Array): ArrayBuffer {
-  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
+  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer
 }
 
 /**
