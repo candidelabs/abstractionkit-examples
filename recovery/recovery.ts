@@ -16,6 +16,7 @@ async function main(): Promise<void> {
     const bundlerUrl = process.env.BUNDLER_URL as string
     const nodeUrl = process.env.NODE_URL as string
     const paymasterUrl = process.env.PAYMASTER_URL as string;
+    const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
 
     const safeOwner = Wallet.createRandom();
     const ownerPublicAddress = process.env.PUBLIC_ADDRESS || safeOwner.address as string
@@ -61,7 +62,7 @@ async function main(): Promise<void> {
     const paymaster = new CandidePaymaster(paymasterUrl)
 
     let [paymasterUserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
-        userOperation, bundlerUrl)
+        userOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     userOperation = paymasterUserOperation;
 
     const cost = calculateUserOperationMaxGasCost(userOperation)
