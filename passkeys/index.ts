@@ -47,6 +47,7 @@ async function main(): Promise<void> {
   const bundlerUrl = process.env.BUNDLER_URL as string
   const nodeUrl = process.env.NODE_URL as string
   const paymasterUrl = process.env.PAYMASTER_URL as string;
+  const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
 
   // Simulated WebAuthn navigator for demonstration
   // In a real browser, you would use: window.navigator.credentials
@@ -136,6 +137,7 @@ async function main(): Promise<void> {
     let [paymasterUserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
       userOperation,
       bundlerUrl,
+      sponsorshipPolicyId,
     )
     userOperation = paymasterUserOperation;
 
