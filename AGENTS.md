@@ -60,6 +60,7 @@ npx ts-node <folder>/<script>.ts
 | Multichain add guardian | `chain-abstraction/` | `add-guardian.ts` |
 | Multichain add owner (Eip-712 Wallet Signed) | `chain-abstraction/` | `add-owner-eip712-signed.ts` |
 | Multichain add owner (Passkey) | `chain-abstraction/` | `add-owner-passkey.ts` |
+| EIP-712 signed UserOp | `eip-712-signing/` | `eip-712-signing.ts` |
 | Nested Safe accounts | `nested-safe-accounts/` | `nested-safe-accounts.ts` |
 | Spending limits | `spend-permission/` | `spend-permission.ts` |
 
