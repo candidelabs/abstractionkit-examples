@@ -8,9 +8,9 @@
  * [1]: <https://github.com/herrjemand/awesome-webauthn#software-authenticators>
  */
 
-import { p256 } from '@noble/curves/p256'
-import { ethers, BytesLike } from 'ethers'
-import CBOR from 'cbor'
+import * as crypto from 'node:crypto'
+import { keccak256, sha256, toHex, hexToBytes, toBytes, maxUint256, type Hex } from 'viem'
+import * as CBOR from 'cbor'
 
 export interface CredentialCreationOptions {
   publicKey: PublicKeyCredentialCreationOptions
@@ -69,7 +69,7 @@ export interface PublicKeyCredential<AuthenticatorResponse> {
 }
 
 /**
- * The authenticator's response to a client’s request for the creation of a new public key credential.
+ * The authenticator's response to a client's request for the creation of a new public key credential.
  * See <https://w3c.github.io/webauthn/#iface-authenticatorattestationresponse>.
  */
 export interface AuthenticatorAttestationResponse {
@@ -78,7 +78,7 @@ export interface AuthenticatorAttestationResponse {
 }
 
 /**
- * The authenticator's response to a client’s request generation of a new authentication assertion given the WebAuthn Relying Party's challenge.
+ * The authenticator's response to a client's request generation of a new authentication assertion given the WebAuthn Relying Party's challenge.
  * See <https://w3c.github.io/webauthn/#iface-authenticatorassertionresponse>.
  */
 export interface AuthenticatorAssertionResponse {
@@ -89,40 +89,66 @@ export interface AuthenticatorAssertionResponse {
 }
 
 class Credential {
-  public id: string
-  public pk: bigint
+  public id: Hex
+  public privateKey: crypto.KeyObject
+  private publicKeyUncompressed: Uint8Array // 65 bytes: 0x04 || x || y
 
   constructor(
     public rp: string,
     public user: Uint8Array,
   ) {
-    this.pk = p256.utils.normPrivateKeyToScalar(p256.utils.randomPrivateKey())
-    this.id = ethers.dataSlice(ethers.keccak256(ethers.dataSlice(p256.getPublicKey(this.pk, false), 1)), 12)
+    const keyPair = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+    this.privateKey = keyPair.privateKey
+
+    // Export uncompressed public key (0x04 || x || y)
+    const pubJwk = keyPair.publicKey.export({ format: 'jwk' })
+    const x = Buffer.from(pubJwk.x!, 'base64url')
+    const y = Buffer.from(pubJwk.y!, 'base64url')
+    this.publicKeyUncompressed = new Uint8Array(Buffer.concat([Buffer.from([0x04]), x, y]))
+
+    // Credential ID = last 20 bytes of keccak256(pubkey without 0x04 prefix)
+    const pubKeyHash = keccak256(toHex(this.publicKeyUncompressed.slice(1)))
+    this.id = `0x${pubKeyHash.slice(26)}` as Hex // skip "0x" + 24 hex chars = 12 bytes
   }
 
   /**
    * Computes the COSE encoded public key for this credential.
    * See <https://datatracker.ietf.org/doc/html/rfc8152>.
-   *
-   * @returns Hex-encoded COSE-encoded public key
    */
-  public cosePublicKey(): string {
-    const pubk = p256.getPublicKey(this.pk, false)
-    const x = pubk.subarray(1, 33)
-    const y = pubk.subarray(33, 65)
+  public cosePublicKey(): Buffer {
+    const x = this.publicKeyUncompressed.subarray(1, 33)
+    const y = this.publicKeyUncompressed.subarray(33, 65)
 
-    // <https://webauthn.guide/#registration>
     const key = new Map()
-    // <https://datatracker.ietf.org/doc/html/rfc8152#section-13.1.1>
     key.set(-1, 1) // crv = P-256
     key.set(-2, b2ab(x))
     key.set(-3, b2ab(y))
-    // <https://datatracker.ietf.org/doc/html/rfc8152#section-7>
     key.set(1, 2) // kty = EC2
-    key.set(3, -7) // alg = ES256 (Elliptic curve signature with SHA-256)
-
-    return ethers.hexlify(CBOR.encode(key))
+    key.set(3, -7) // alg = ES256
+    return CBOR.encode(key)
   }
+}
+
+/**
+ * Build authenticator data as a binary buffer.
+ * See <https://w3c.github.io/webauthn/#sctn-authenticator-data>
+ */
+function buildAuthenticatorData(
+  rpId: string,
+  flags: number,
+  signCount: number,
+  attestedCredentialData?: Buffer,
+): Buffer {
+  const rpIdHash = Buffer.from(hexToBytes(sha256(toBytes(rpId))))
+  const flagsBuf = Buffer.from([flags])
+  const signCountBuf = Buffer.alloc(4)
+  signCountBuf.writeUInt32BE(signCount)
+
+  const parts = [rpIdHash, flagsBuf, signCountBuf]
+  if (attestedCredentialData) {
+    parts.push(attestedCredentialData)
+  }
+  return Buffer.concat(parts)
 }
 
 export class WebAuthnCredentials {
@@ -131,9 +157,6 @@ export class WebAuthnCredentials {
   /**
    * This is a shim for `navigator.credentials.create` method.
    * See <https://w3c.github.io/webappsec-credential-management/#dom-credentialscontainer-create>.
-   *
-   * @param options The public key credential creation options.
-   * @returns A public key credential with an attestation response.
    */
   public create({ publicKey }: CredentialCreationOptions): PublicKeyCredential<AuthenticatorAttestationResponse> {
     if (!publicKey.pubKeyCredParams.some(({ alg }) => alg === -7)) {
@@ -143,7 +166,6 @@ export class WebAuthnCredentials {
     const credential = new Credential(publicKey.rp.id, publicKey.user.id)
     this.#credentials.push(credential)
 
-    // <https://w3c.github.io/webauthn/#dictionary-client-data>
     const clientData = {
       type: 'webauthn.create',
       challenge: base64UrlEncode(publicKey.challenge).replace(/=*$/, ''),
@@ -153,31 +175,27 @@ export class WebAuthnCredentials {
     const userVerification = publicKey.userVerification ?? 'preferred'
     const userVerificationFlag = userVerification === UserVerificationRequirement.required ? 0x04 : 0x01
 
-    // <https://w3c.github.io/webauthn/#sctn-attestation>
-    const attestationObject = {
-      authData: ethers.getBytes(
-        ethers.solidityPacked(
-          ['bytes32', 'uint8', 'uint32', 'bytes16', 'uint16', 'bytes', 'bytes'],
-          [
-            ethers.sha256(ethers.toUtf8Bytes(publicKey.rp.id)),
-            0x40 + userVerificationFlag, // flags = attested_data + user_present
-            0, // signCount
-            `0x${'42'.repeat(16)}`, // aaguid
-            ethers.dataLength(credential.id),
-            credential.id,
-            credential.cosePublicKey(),
-          ],
-        ),
-      ),
-      fmt: 'none',
-      attStmt: {},
-    }
+    // Build attested credential data: aaguid (16) + credIdLen (2) + credId + coseKey
+    const aaguid = Buffer.alloc(16, 0x42)
+    const credIdBytes = Buffer.from(hexToBytes(credential.id))
+    const credIdLen = Buffer.alloc(2)
+    credIdLen.writeUInt16BE(credIdBytes.length)
+    const attestedCredentialData = Buffer.concat([aaguid, credIdLen, credIdBytes, credential.cosePublicKey()])
+
+    const authData = buildAuthenticatorData(
+      publicKey.rp.id,
+      0x40 + userVerificationFlag, // flags = attested_data + user_present
+      0,
+      attestedCredentialData,
+    )
+
+    const attestationObject = { authData, fmt: 'none', attStmt: {} }
 
     return {
       id: base64UrlEncode(credential.id),
-      rawId: ethers.getBytes(credential.id),
+      rawId: hexToBytes(credential.id),
       response: {
-        clientDataJSON: b2ab(ethers.toUtf8Bytes(JSON.stringify(clientData))),
+        clientDataJSON: b2ab(Buffer.from(JSON.stringify(clientData))),
         attestationObject: b2ab(CBOR.encode(attestationObject)),
       },
       type: 'public-key',
@@ -187,19 +205,15 @@ export class WebAuthnCredentials {
   /**
    * This is a shim for `navigator.credentials.get` method.
    * See <https://w3c.github.io/webappsec-credential-management/#dom-credentialscontainer-get>.
-   *
-   * @param options The public key credential request options.
-   * @returns A public key credential with an assertion response.
    */
   get({ publicKey }: CredentialRequestOptions): PublicKeyCredential<AuthenticatorAssertionResponse> {
     const credential = publicKey.allowCredentials
-      .flatMap(({ id }) => this.#credentials.filter((c) => c.rp === publicKey.rpId && c.id === ethers.hexlify(id)))
+      .flatMap(({ id }) => this.#credentials.filter((c) => c.rp === publicKey.rpId && c.id === toHex(id)))
       .at(0)
     if (credential === undefined) {
       throw new Error('credential not found')
     }
 
-    // <https://w3c.github.io/webauthn/#dictionary-client-data>
     const clientData = {
       type: 'webauthn.get',
       challenge: base64UrlEncode(publicKey.challenge).replace(/=*$/, ''),
@@ -208,37 +222,21 @@ export class WebAuthnCredentials {
 
     const userVerification = publicKey.userVerification ?? 'preferred'
     const userVerificationFlag = userVerification === UserVerificationRequirement.required ? 0x04 : 0x01
-    // <https://w3c.github.io/webauthn/#sctn-authenticator-data>
-    // Note that we use a constant 0 value for signCount to simplify things:
-    // > If the authenticator does not implement a signature counter, let the signature counter
-    // > value remain constant at zero.
-    const authenticatorData = ethers.solidityPacked(
-      ['bytes32', 'uint8', 'uint32'],
-      [
-        ethers.sha256(ethers.toUtf8Bytes(publicKey.rpId)),
-        userVerificationFlag, // flags = user_present
-        0, // signCount
-      ],
-    )
 
-    // <https://w3c.github.io/webauthn/#sctn-op-get-assertion>
-    // <https://w3c.github.io/webauthn/#fig-signature>
-    const signature = p256.sign(
-      ethers.getBytes(ethers.concat([authenticatorData, ethers.sha256(ethers.toUtf8Bytes(JSON.stringify(clientData)))])),
-      credential.pk,
-      {
-        lowS: false,
-        prehash: true,
-      },
-    )
+    const authenticatorData = buildAuthenticatorData(publicKey.rpId, userVerificationFlag, 0)
+
+    // Sign: authenticatorData || sha256(clientDataJSON)
+    const clientDataHash = Buffer.from(hexToBytes(sha256(toBytes(JSON.stringify(clientData)))))
+    const dataToSign = Buffer.concat([authenticatorData, clientDataHash])
+    const derSignature = crypto.sign('sha256', dataToSign, credential.privateKey)
 
     return {
       id: base64UrlEncode(credential.id),
-      rawId: ethers.getBytes(credential.id),
+      rawId: hexToBytes(credential.id),
       response: {
-        clientDataJSON: b2ab(ethers.toUtf8Bytes(JSON.stringify(clientData))),
-        authenticatorData: b2ab(ethers.getBytes(authenticatorData)),
-        signature: b2ab(signature.toDERRawBytes(false)),
+        clientDataJSON: b2ab(Buffer.from(JSON.stringify(clientData))),
+        authenticatorData: b2ab(authenticatorData),
+        signature: b2ab(derSignature),
         userHandle: credential.user,
       },
       type: 'public-key',
@@ -248,15 +246,16 @@ export class WebAuthnCredentials {
 
 /**
  * Encode bytes using the Base64 URL encoding.
- *
  * See <https://www.rfc-editor.org/rfc/rfc4648#section-5>
- *
- * @param data data to encode to `base64url`
- * @returns the `base64url` encoded data as a string.
  */
-export function base64UrlEncode(data: BytesLike | ArrayBufferLike): string {
-  const bytes = ethers.isBytesLike(data) ? data : new Uint8Array(data)
-  return ethers.encodeBase64(bytes).replace(/\+/g, '-').replace(/\//g, '_').replace(/=*$/, '')
+export function base64UrlEncode(data: Hex | Uint8Array | ArrayBufferLike): string {
+  if (typeof data === 'string') {
+    return Buffer.from(hexToBytes(data)).toString('base64url')
+  }
+  if (data instanceof Uint8Array) {
+    return Buffer.from(data).toString('base64url')
+  }
+  return Buffer.from(new Uint8Array(data)).toString('base64url')
 }
 
 function b2ab(buf: Uint8Array): ArrayBuffer {
@@ -269,11 +268,12 @@ function b2ab(buf: Uint8Array): ArrayBuffer {
  */
 export function extractPublicKey(response: AuthenticatorAttestationResponse): { x: bigint; y: bigint } {
   const attestationObject = CBOR.decode(response.attestationObject)
-  const authDataView = new DataView(attestationObject.authData.buffer)
+  const authData: Buffer = attestationObject.authData
+  const authDataView = new DataView(authData.buffer, authData.byteOffset, authData.byteLength)
   const credentialIdLength = authDataView.getUint16(53)
-  const cosePublicKey = attestationObject.authData.slice(55 + credentialIdLength)
+  const cosePublicKey = authData.subarray(55 + credentialIdLength)
   const key: Map<number, unknown> = CBOR.decode(cosePublicKey)
-  const bn = (bytes: Uint8Array) => BigInt(ethers.hexlify(bytes))
+  const bn = (bytes: Uint8Array) => BigInt(toHex(bytes))
   return {
     x: bn(key.get(-2) as Uint8Array),
     y: bn(key.get(-3) as Uint8Array),
@@ -296,7 +296,7 @@ export function extractClientDataFields(response: AuthenticatorAssertionResponse
   }
 
   const [, fields] = match
-  return ethers.hexlify(ethers.toUtf8Bytes(fields))
+  return toHex(toBytes(fields))
 }
 
 /**
@@ -328,8 +328,8 @@ export function extractSignature(response: AuthenticatorAssertionResponse): [big
     const len = view.getUint8(offset + 1)
     const start = offset + 2
     const end = start + len
-    const n = BigInt(ethers.hexlify(new Uint8Array(view.buffer.slice(start, end))))
-    check(n < ethers.MaxUint256)
+    const n = BigInt(toHex(new Uint8Array(view.buffer.slice(start, end))))
+    check(n < maxUint256)
     return [n, end] as const
   }
   const [r, sOffset] = readInt(2)
