@@ -173,7 +173,7 @@ export class WebAuthnCredentials {
     }
 
     const userVerification = publicKey.userVerification ?? 'preferred'
-    const userVerificationFlag = userVerification === UserVerificationRequirement.required ? 0x04 : 0x01
+    const uvFlag = userVerification === UserVerificationRequirement.required ? 0x04 : 0x00
 
     // Build attested credential data: aaguid (16) + credIdLen (2) + credId + coseKey
     const aaguid = Buffer.alloc(16, 0x42)
@@ -184,7 +184,7 @@ export class WebAuthnCredentials {
 
     const authData = buildAuthenticatorData(
       publicKey.rp.id,
-      0x40 + userVerificationFlag, // flags = attested_data + user_present
+      0x41 | uvFlag, // flags = AT (0x40) + UP (0x01) + optionally UV (0x04)
       0,
       attestedCredentialData,
     )
@@ -193,7 +193,7 @@ export class WebAuthnCredentials {
 
     return {
       id: base64UrlEncode(credential.id),
-      rawId: hexToBytes(credential.id),
+      rawId: b2ab(hexToBytes(credential.id)),
       response: {
         clientDataJSON: b2ab(Buffer.from(JSON.stringify(clientData))),
         attestationObject: b2ab(CBOR.encode(attestationObject)),
@@ -221,9 +221,9 @@ export class WebAuthnCredentials {
     }
 
     const userVerification = publicKey.userVerification ?? 'preferred'
-    const userVerificationFlag = userVerification === UserVerificationRequirement.required ? 0x04 : 0x01
+    const uvFlag = userVerification === UserVerificationRequirement.required ? 0x04 : 0x00
 
-    const authenticatorData = buildAuthenticatorData(publicKey.rpId, userVerificationFlag, 0)
+    const authenticatorData = buildAuthenticatorData(publicKey.rpId, 0x01 | uvFlag, 0)
 
     // Sign: authenticatorData || sha256(clientDataJSON)
     const clientDataHash = Buffer.from(hexToBytes(sha256(toBytes(JSON.stringify(clientData)))))
@@ -232,7 +232,7 @@ export class WebAuthnCredentials {
 
     return {
       id: base64UrlEncode(credential.id),
-      rawId: hexToBytes(credential.id),
+      rawId: b2ab(hexToBytes(credential.id)),
       response: {
         clientDataJSON: b2ab(Buffer.from(JSON.stringify(clientData))),
         authenticatorData: b2ab(authenticatorData),
