@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv'
-import { Wallet } from "ethers";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
     SafeAccountV0_3_0,
     MetaTransaction,
@@ -14,9 +14,10 @@ async function main(): Promise<void> {
     const bundlerUrl = process.env.BUNDLER_URL as string
     const nodeUrl = process.env.NODE_URL as string
 
-    const owner = Wallet.createRandom();
+    const ownerPrivateKeyGenerated = generatePrivateKey();
+    const owner = privateKeyToAccount(ownerPrivateKeyGenerated);
     const ownerPublicAddress = process.env.PUBLIC_ADDRESS || owner.address as string
-    const ownerPrivateKey = process.env.PRIVATE_KEY || owner.privateKey as string
+    const ownerPrivateKey = process.env.PRIVATE_KEY || ownerPrivateKeyGenerated as string
 
     const tenderlyAccountSlug = '';
     const tenderlyProjectSlug = '';

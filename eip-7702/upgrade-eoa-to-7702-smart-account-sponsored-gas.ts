@@ -6,7 +6,7 @@ import {
     createAndSignEip7702DelegationAuthorization,
     CandidePaymaster,
 } from "abstractionkit";
-import { Wallet } from 'ethers';
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 async function main(): Promise<void> {
     //get values from .env
@@ -14,10 +14,10 @@ async function main(): Promise<void> {
     const chainId = BigInt(process.env.CHAIN_ID as string)
     const bundlerUrl = process.env.BUNDLER_URL as string
     const nodeUrl = process.env.NODE_URL as string;
-    
-    const eoaDelegator = Wallet.createRandom();
+
+    const eoaDelegatorPrivateKey = generatePrivateKey();
+    const eoaDelegator = privateKeyToAccount(eoaDelegatorPrivateKey);
     const eoaDelegatorPublicAddress = eoaDelegator.address;
-    const eoaDelegatorPrivateKey = eoaDelegator.privateKey;
     const paymasterUrl = process.env.PAYMASTER_URL as string;
     const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
 
