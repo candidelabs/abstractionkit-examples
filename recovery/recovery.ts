@@ -7,7 +7,7 @@ import {
     SocialRecoveryModule
 } from "abstractionkit";
 
-import { Wallet } from "ethers";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 async function main(): Promise<void> {
     //get values from .env
@@ -18,13 +18,14 @@ async function main(): Promise<void> {
     const paymasterUrl = process.env.PAYMASTER_URL as string;
     const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
 
-    const safeOwner = Wallet.createRandom();
+    const safeOwnerPrivateKey = generatePrivateKey();
+    const safeOwner = privateKeyToAccount(safeOwnerPrivateKey);
     const ownerPublicAddress = process.env.PUBLIC_ADDRESS || safeOwner.address as string
-    const ownerPrivateKey = process.env.PRIVATE_KEY || safeOwner.privateKey as string
+    const ownerPrivateKey = process.env.PRIVATE_KEY || safeOwnerPrivateKey as string
 
 
-    const guardianWallet = Wallet.createRandom();
-    const guardianPublicAddress = guardianWallet.address as string;
+    const guardian = privateKeyToAccount(generatePrivateKey());
+    const guardianPublicAddress = guardian.address as string;
 
     //initializeNewAccount only needed when the smart account
     //have not been deployed yet for its first useroperation.

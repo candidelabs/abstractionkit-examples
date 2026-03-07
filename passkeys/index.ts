@@ -11,7 +11,7 @@
  */
 
 import * as dotenv from 'dotenv'
-import * as ethers from 'ethers'
+import { hexToBytes, keccak256, toBytes, numberToBytes } from 'viem'
 import {
   SafeAccountV0_3_0 as SafeAccount,
   MetaTransaction,
@@ -68,11 +68,11 @@ async function main(): Promise<void> {
         id: 'safe.global',
       },
       user: {
-        id: ethers.getBytes(ethers.id('chucknorris')),
+        id: hexToBytes(keccak256(toBytes('chucknorris'))),
         name: 'chucknorris',
         displayName: 'Chuck Norris',
       },
-      challenge: ethers.toBeArray(Date.now()),
+      challenge: numberToBytes(Date.now()),
       pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
     },
   })
@@ -150,7 +150,7 @@ async function main(): Promise<void> {
     // Simulate passkey authentication (biometric prompt in real browser)
     const assertion = navigator.credentials.get({
       publicKey: {
-        challenge: ethers.getBytes(safeInitOpHash),
+        challenge: hexToBytes(safeInitOpHash as `0x${string}`),
         rpId: 'safe.global',
         allowCredentials: [{ type: 'public-key', id: new Uint8Array(credential.rawId) }],
         userVerification: UserVerificationRequirement.required,

@@ -16,7 +16,8 @@
  */
 
 import * as dotenv from 'dotenv'
-import * as ethers from 'ethers'
+import { hexToBytes, keccak256, toBytes, numberToBytes } from 'viem'
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
 import {
     SafeMultiChainSigAccount as SafeAccount,
     AllowAllPaymaster,
@@ -64,11 +65,11 @@ async function main(): Promise<void> {
                 id: 'safe.global',
             },
             user: {
-                id: ethers.getBytes(ethers.id('chain-abstraction-demo')),
+                id: hexToBytes(keccak256(toBytes('chain-abstraction-demo'))),
                 name: 'demo-user',
                 displayName: 'Demo User',
             },
-            challenge: ethers.toBeArray(Date.now()),
+            challenge: numberToBytes(Date.now()),
             pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
         },
     })
@@ -84,7 +85,7 @@ async function main(): Promise<void> {
     console.log("  Public key X:", publicKey.x.toString().slice(0, 20) + "...")
 
     // Generate a new owner address to add (using random address for demo)
-    const newOwnerAddress = ethers.Wallet.createRandom().address
+    const newOwnerAddress = privateKeyToAccount(generatePrivateKey()).address
 
     console.log("\nPasskey owner (signer):", credential.id.slice(0, 20) + "...")
     console.log("New owner to add:", newOwnerAddress)
@@ -157,7 +158,7 @@ async function main(): Promise<void> {
     // In a browser, this would trigger device biometrics
     const assertion = navigator.credentials.get({
         publicKey: {
-            challenge: ethers.getBytes(multiChainHash),
+            challenge: hexToBytes(multiChainHash as `0x${string}`),
             rpId: 'safe.global',
             allowCredentials: [{ type: 'public-key', id: new Uint8Array(credential.rawId) }],
             userVerification: UserVerificationRequirement.required,
