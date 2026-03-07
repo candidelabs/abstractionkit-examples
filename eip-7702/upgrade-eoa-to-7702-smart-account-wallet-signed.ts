@@ -7,7 +7,8 @@ import {
     createEip7702DelegationAuthorizationHash,
     createUserOperationHash,
 } from "abstractionkit";
-import { JsonRpcProvider, toBeHex, Wallet } from 'ethers';
+import { generatePrivateKey, privateKeyToAccount, sign } from "viem/accounts";
+import { createPublicClient, http, toHex } from "viem";
 
 async function main(): Promise<void> {
     try {
@@ -17,9 +18,10 @@ async function main(): Promise<void> {
         const bundlerUrl = process.env.BUNDLER_URL as string
         const nodeUrl = process.env.NODE_URL as string;
 
-        const provider = new JsonRpcProvider(nodeUrl);
+        const client = createPublicClient({ transport: http(nodeUrl) });
 
-        const eoaDelegator = Wallet.createRandom(provider);
+        const eoaDelegatorPrivateKey = generatePrivateKey();
+        const eoaDelegator = privateKeyToAccount(eoaDelegatorPrivateKey);
         const eoaDelegatorPublicAddress = eoaDelegator.address;
         const paymasterUrl = process.env.PAYMASTER_URL as string;
         const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
@@ -58,7 +60,7 @@ async function main(): Promise<void> {
             }
         );
 
-        const nonce = await eoaDelegator.getNonce();
+        const nonce = await client.getTransactionCount({ address: eoaDelegatorPublicAddress });
 
         const eip7702DelegationAuthorizationHash = createEip7702DelegationAuthorizationHash(
             chainId,
@@ -66,17 +68,15 @@ async function main(): Promise<void> {
             BigInt(nonce)
         );
 
-        const signedHash = eoaDelegator.signingKey.sign(
-            eip7702DelegationAuthorizationHash,
-        );
+        const delegationSig = await sign({ hash: eip7702DelegationAuthorizationHash as `0x${string}`, privateKey: eoaDelegatorPrivateKey });
 
         userOperation.eip7702Auth = {
-            chainId: toBeHex(chainId),
+            chainId: toHex(chainId),
             address: smartAccount.delegateeAddress,
-            nonce: toBeHex(nonce),
-            yParity: toBeHex(signedHash.yParity),
-            r: signedHash.r,
-            s: signedHash.s
+            nonce: toHex(nonce),
+            yParity: toHex(delegationSig.v === 27n ? 0 : 1),
+            r: delegationSig.r,
+            s: delegationSig.s
         };
 
         const paymaster = new CandidePaymaster(paymasterUrl);
@@ -91,7 +91,7 @@ async function main(): Promise<void> {
             chainId,
         );
 
-        userOperation.signature = eoaDelegator.signingKey.sign(userOperationHash).serialized;
+        userOperation.signature = await sign({ hash: userOperationHash as `0x${string}`, privateKey: eoaDelegatorPrivateKey, to: 'hex' });
 
         let sendUserOperationResponse = await smartAccount.sendUserOperation(
             userOperation, bundlerUrl
