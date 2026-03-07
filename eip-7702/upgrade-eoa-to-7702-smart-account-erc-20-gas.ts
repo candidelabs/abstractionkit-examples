@@ -67,7 +67,7 @@ async function main(): Promise<void> {
     
     const paymaster = new CandidePaymaster(paymasterUrl);
 
-    const tokensSupported = await paymaster.fetchSupportedERC20TokensAndPaymasterMetadata(Simple7702Account.DEFAULT_ENTRYPOINT_ADDRESS);
+    const tokensSupported = await paymaster.fetchSupportedERC20TokensAndPaymasterMetadata(smartAccount.entrypointAddress);
     const tokenSelected = tokensSupported.tokens.find(token => token.address.toLocaleLowerCase() === paymasterTokenAddress.toLowerCase());
 
     console.log("This example uses Candide Token Paymaster");
