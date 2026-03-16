@@ -1,5 +1,5 @@
 import * as dotenv from 'dotenv'
-import * as ethers from 'ethers'
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 import {
     SafeAccountV0_3_0 as SafeAccount,
@@ -20,11 +20,15 @@ async function main(): Promise<void> {
     const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
 
     /*subaccount1 signers*/
-    const signer1Subaccount1 = ethers.Wallet.createRandom();
-    const signer2Subaccount1 = ethers.Wallet.createRandom();
+    const signer1Subaccount1PrivateKey = generatePrivateKey();
+    const signer1Subaccount1 = privateKeyToAccount(signer1Subaccount1PrivateKey);
+    const signer2Subaccount1PrivateKey = generatePrivateKey();
+    const signer2Subaccount1 = privateKeyToAccount(signer2Subaccount1PrivateKey);
     /*subaccount2 signers*/
-    const signer1Subaccount2 = ethers.Wallet.createRandom();
-    const signer2Subaccount2 = ethers.Wallet.createRandom();
+    const signer1Subaccount2PrivateKey = generatePrivateKey();
+    const signer1Subaccount2 = privateKeyToAccount(signer1Subaccount2PrivateKey);
+    const signer2Subaccount2PrivateKey = generatePrivateKey();
+    const signer2Subaccount2 = privateKeyToAccount(signer2Subaccount2PrivateKey);
 
     /* initialize subaccounts */
     const subAccount1 = SafeAccount.initializeNewAccount(
@@ -66,7 +70,7 @@ async function main(): Promise<void> {
 
     subAccount1DeployMainAccountUserOperation.signature = subAccount1.signUserOperation(
         subAccount1DeployMainAccountUserOperation,
-        [signer1Subaccount1.privateKey, signer2Subaccount1.privateKey],
+        [signer1Subaccount1PrivateKey, signer2Subaccount1PrivateKey],
         chainId,
     )
 
@@ -176,7 +180,7 @@ async function main(): Promise<void> {
 
     subAccount1UserOperation.signature = subAccount1.signUserOperation(
         subAccount1UserOperation,
-        [signer1Subaccount1.privateKey, signer2Subaccount1.privateKey],
+        [signer1Subaccount1PrivateKey, signer2Subaccount1PrivateKey],
         chainId,
     )
     let subAccount2UserOperation = await subAccount2.createUserOperation(
@@ -190,7 +194,7 @@ async function main(): Promise<void> {
 
     subAccount2UserOperation.signature = subAccount2.signUserOperation(
         subAccount2UserOperation,
-        [signer1Subaccount2.privateKey, signer2Subaccount2.privateKey],
+        [signer1Subaccount2PrivateKey, signer2Subaccount2PrivateKey],
         chainId,
     )
     /***********************************/

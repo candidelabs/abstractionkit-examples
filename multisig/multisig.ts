@@ -9,7 +9,7 @@ import {
     CandidePaymaster,
 } from "abstractionkit";
 
-import { Wallet } from "ethers";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 async function main(): Promise<void> {
     //get values from .env
@@ -21,8 +21,10 @@ async function main(): Promise<void> {
     const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID;
 
 
-    const owner1 = Wallet.createRandom();
-    const owner2 = Wallet.createRandom();
+    const owner1PrivateKey = generatePrivateKey();
+    const owner1 = privateKeyToAccount(owner1PrivateKey);
+    const owner2PrivateKey = generatePrivateKey();
+    const owner2 = privateKeyToAccount(owner2PrivateKey);
 
     //initializeNewAccount only needed when the smart account
     //have not been deployed yet for its first useroperation.
@@ -98,7 +100,7 @@ async function main(): Promise<void> {
     //privateKeys
     userOperation.signature = smartAccount.signUserOperation(
         userOperation,
-        [owner1.privateKey, owner2.privateKey],
+        [owner1PrivateKey, owner2PrivateKey],
         chainId
     )
     console.log(userOperation)

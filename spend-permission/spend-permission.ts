@@ -5,15 +5,10 @@ import {
     CandidePaymaster,
     ZeroAddress
 } from "abstractionkit";
-import {
-    Wallet,
-    Contract,
-    JsonRpcProvider,
-} from "ethers";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { createPublicClient, http, parseAbi } from "viem";
 
-const ERC20_ABI = [
-    "function balanceOf(address owner) view returns (uint256)",
-];
+const ERC20_ABI = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 async function main(): Promise<void> {
     //get values from .env
@@ -30,18 +25,22 @@ async function main(): Promise<void> {
     const sourceOwnerPrivateKey = process.env.PRIVATE_KEY as string;
 
     // delegate account owner
-    const delegateOwner = Wallet.createRandom();
+    const delegateOwnerPrivateKey = generatePrivateKey();
+    const delegateOwner = privateKeyToAccount(delegateOwnerPrivateKey);
     const delegateOwnerPublicAddress = delegateOwner.address;
-    const delegateOwnerPrivateKey = delegateOwner.privateKey;
 
     // source safe account
     const sourceSafeAccount = SafeAccount.initializeNewAccount(
         [sourceOwnerPublicAddress], { c2Nonce: 0n }
     );
 
-    const provider = new JsonRpcProvider(nodeUrl);
-    const tokenContract = new Contract(allowanceToken, ERC20_ABI, provider);
-    const sourceSafeAccountBalance = await tokenContract.balanceOf(sourceSafeAccount.accountAddress);
+    const client = createPublicClient({ transport: http(nodeUrl) });
+    const sourceSafeAccountBalance = await client.readContract({
+        address: allowanceToken as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'balanceOf',
+        args: [sourceSafeAccount.accountAddress as `0x${string}`],
+    });
 
     if (sourceSafeAccountBalance <= 2n) {
         console.log("Please fund the Safe Account with some tokens first");
