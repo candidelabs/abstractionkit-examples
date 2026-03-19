@@ -15,7 +15,7 @@
  * Learn more: https://docs.candide.dev/account-abstraction/research/safe-unified-account
  */
 
-import * as dotenv from 'dotenv'
+import { loadMultiChainEnv } from '../utils/env'
 import { hexToBytes, keccak256, toBytes, numberToBytes } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
 import {
@@ -36,15 +36,7 @@ import {
 } from '../passkeys/webauthn';
 
 async function main(): Promise<void> {
-    dotenv.config()
-
-    // Chain configuration - set in .env (see .env.example)
-    const chainId1 = BigInt(process.env.CHAIN_ID1 as string)
-    const chainId2 = BigInt(process.env.CHAIN_ID2 as string)
-    const bundlerUrl1 = process.env.BUNDLER_URL1 as string
-    const bundlerUrl2 = process.env.BUNDLER_URL2 as string
-    const nodeUrl1 = process.env.NODE_URL1 as string
-    const nodeUrl2 = process.env.NODE_URL2 as string
+    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2 } = loadMultiChainEnv()
 
     console.log("=".repeat(60))
     console.log("ADD OWNER - PASSKEY (WEBAUTHN) SIGNED DEMO")
@@ -187,10 +179,11 @@ async function main(): Promise<void> {
 
     // Format the single passkey signature into per-UserOperation signatures
     // isInit is required for WebAuthn signatures - true for first tx (account deployment)
+    // safe4337ModuleAddress must be passed to ensure the merkle proof matches the signed hash
     const signatures = SafeAccount.formatSignaturesToUseroperationsSignatures(
         userOperationsToSign,
         [signerSignaturePair],
-        { isInit: userOperation1.nonce == 0n }
+        { isInit: userOperation1.nonce == 0n, safe4337ModuleAddress: SafeAccount.DEFAULT_SAFE_4337_MODULE_ADDRESS } as any,
     );
 
     console.log("  Single passkey signature formatted into", signatures.length, "UserOperation signatures")

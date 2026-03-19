@@ -16,9 +16,9 @@
  * Learn more: https://docs.candide.dev/account-abstraction/research/safe-unified-account
  */
 
-import * as dotenv from 'dotenv'
+import { loadMultiChainEnv, getOrCreateOwner } from '../utils/env'
 import { createWalletClient, http } from 'viem'
-import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
+import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
 import {
     ExperimentalSafeMultiChainSigAccount as SafeAccount,
@@ -27,20 +27,9 @@ import {
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    dotenv.config()
-
-    // Chain configuration - set in .env (see .env.example)
-    const chainId1 = BigInt(process.env.CHAIN_ID1 as string)
-    const chainId2 = BigInt(process.env.CHAIN_ID2 as string)
-    const bundlerUrl1 = process.env.BUNDLER_URL1 as string
-    const bundlerUrl2 = process.env.BUNDLER_URL2 as string
-    const nodeUrl1 = process.env.NODE_URL1 as string
-    const nodeUrl2 = process.env.NODE_URL2 as string
-
-    // Auto-generate keys if not provided
-    const ownerPrivateKey = (process.env.PRIVATE_KEY || generatePrivateKey()) as `0x${string}`
-    const ownerAccount = privateKeyToAccount(ownerPrivateKey)
-    const ownerPublicAddress = process.env.PUBLIC_ADDRESS || ownerAccount.address
+    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2 } = loadMultiChainEnv()
+    const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
+    const ownerAccount = privateKeyToAccount(ownerPrivateKey as `0x${string}`)
 
     // Generate a new owner address to add
     const newOwnerAccount = privateKeyToAccount(generatePrivateKey())
@@ -134,9 +123,12 @@ async function main(): Promise<void> {
     console.log("  Signature obtained:", signature.slice(0, 20) + "...")
 
     // Format the single signature into per-UserOperation signatures
+    // Note: safe4337ModuleAddress must be passed to ensure the merkle proof
+    // is computed with the same module address used during EIP-712 data generation
     const signatures = SafeAccount.formatSignaturesToUseroperationsSignatures(
         userOperationsToSign,
-        [{ signer: ownerPublicAddress, signature }]
+        [{ signer: ownerPublicAddress, signature }],
+        { safe4337ModuleAddress: eip712Data.domain.verifyingContract } as any,
     );
 
     console.log("  Formatted into", signatures.length, "UserOperation signatures")

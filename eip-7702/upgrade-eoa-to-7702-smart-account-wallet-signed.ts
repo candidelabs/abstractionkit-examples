@@ -1,4 +1,4 @@
-import * as dotenv from 'dotenv'
+import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
     Simple7702Account,
     getFunctionSelector,
@@ -7,24 +7,15 @@ import {
     createEip7702DelegationAuthorizationHash,
     createUserOperationHash,
 } from "abstractionkit";
-import { generatePrivateKey, privateKeyToAccount, sign } from "viem/accounts";
+import { sign } from "viem/accounts";
 import { createPublicClient, http, toHex } from "viem";
 
 async function main(): Promise<void> {
     try {
-        //get values from .env
-        dotenv.config();
-        const chainId = BigInt(process.env.CHAIN_ID as string)
-        const bundlerUrl = process.env.BUNDLER_URL as string
-        const nodeUrl = process.env.NODE_URL as string;
+        const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
+        const { publicAddress: eoaDelegatorPublicAddress, privateKey: eoaDelegatorPrivateKey } = getOrCreateOwner()
 
         const client = createPublicClient({ transport: http(nodeUrl) });
-
-        const eoaDelegatorPrivateKey = generatePrivateKey();
-        const eoaDelegator = privateKeyToAccount(eoaDelegatorPrivateKey);
-        const eoaDelegatorPublicAddress = eoaDelegator.address;
-        const paymasterUrl = process.env.PAYMASTER_URL as string;
-        const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
 
         // This example demonstrates upgrading an EOA to a 7702 smart account using pre-signed hashes
         // instead of directly passing the private key. This approach is useful when the signing logic
@@ -60,7 +51,7 @@ async function main(): Promise<void> {
             }
         );
 
-        const nonce = await client.getTransactionCount({ address: eoaDelegatorPublicAddress });
+        const nonce = await client.getTransactionCount({ address: eoaDelegatorPublicAddress as `0x${string}` });
 
         const eip7702DelegationAuthorizationHash = createEip7702DelegationAuthorizationHash(
             chainId,
@@ -68,7 +59,7 @@ async function main(): Promise<void> {
             BigInt(nonce)
         );
 
-        const delegationSig = await sign({ hash: eip7702DelegationAuthorizationHash as `0x${string}`, privateKey: eoaDelegatorPrivateKey });
+        const delegationSig = await sign({ hash: eip7702DelegationAuthorizationHash as `0x${string}`, privateKey: eoaDelegatorPrivateKey as `0x${string}` });
 
         userOperation.eip7702Auth = {
             chainId: toHex(chainId),
@@ -91,7 +82,7 @@ async function main(): Promise<void> {
             chainId,
         );
 
-        userOperation.signature = await sign({ hash: userOperationHash as `0x${string}`, privateKey: eoaDelegatorPrivateKey, to: 'hex' });
+        userOperation.signature = await sign({ hash: userOperationHash as `0x${string}`, privateKey: eoaDelegatorPrivateKey as `0x${string}`, to: 'hex' });
 
         let sendUserOperationResponse = await smartAccount.sendUserOperation(
             userOperation, bundlerUrl

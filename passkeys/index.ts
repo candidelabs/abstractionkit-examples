@@ -10,7 +10,7 @@
  * In a real browser application, use the native navigator.credentials API.
  */
 
-import * as dotenv from 'dotenv'
+import { loadEnv } from '../utils/env'
 import { hexToBytes, keccak256, toBytes, numberToBytes } from 'viem'
 import {
   SafeAccountV0_3_0 as SafeAccount,
@@ -32,22 +32,7 @@ import {
 } from './webauthn';
 
 async function main(): Promise<void> {
-  // Load environment variables
-  dotenv.config()
-
-  // Validate required environment variables
-  const requiredEnvVars = ['CHAIN_ID', 'BUNDLER_URL', 'NODE_URL', 'PAYMASTER_URL'];
-  for (const varName of requiredEnvVars) {
-    if (!process.env[varName]) {
-      throw new Error(`Missing required environment variable: ${varName}`);
-    }
-  }
-
-  const chainId = BigInt(process.env.CHAIN_ID as string)
-  const bundlerUrl = process.env.BUNDLER_URL as string
-  const nodeUrl = process.env.NODE_URL as string
-  const paymasterUrl = process.env.PAYMASTER_URL as string;
-  const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
+  const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
 
   // Simulated WebAuthn navigator for demonstration
   // In a real browser, you would use: window.navigator.credentials

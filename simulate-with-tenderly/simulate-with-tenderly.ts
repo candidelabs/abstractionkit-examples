@@ -1,5 +1,4 @@
-import * as dotenv from 'dotenv'
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
+import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
     SafeAccountV0_3_0,
     MetaTransaction,
@@ -9,15 +8,8 @@ import {
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    dotenv.config()
-    const chainId = BigInt(process.env.CHAIN_ID as string)
-    const bundlerUrl = process.env.BUNDLER_URL as string
-    const nodeUrl = process.env.NODE_URL as string
-
-    const ownerPrivateKeyGenerated = generatePrivateKey();
-    const owner = privateKeyToAccount(ownerPrivateKeyGenerated);
-    const ownerPublicAddress = process.env.PUBLIC_ADDRESS || owner.address as string
-    const ownerPrivateKey = process.env.PRIVATE_KEY || ownerPrivateKeyGenerated as string
+    const { chainId, bundlerUrl, nodeUrl } = loadEnv()
+    const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
 
     const tenderlyAccountSlug = '';
     const tenderlyProjectSlug = '';

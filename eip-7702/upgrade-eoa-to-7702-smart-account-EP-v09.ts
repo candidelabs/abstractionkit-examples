@@ -1,4 +1,4 @@
-import * as dotenv from "dotenv";
+import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
     Simple7702AccountV09 as Simple7702Account,
     getFunctionSelector,
@@ -6,16 +6,10 @@ import {
     createAndSignEip7702DelegationAuthorization,
     ExperimentalAllowAllParallelPaymaster,
 } from "abstractionkit";
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 async function main(): Promise<void> {
-    dotenv.config();
-    const chainId = BigInt(process.env.CHAIN_ID as string);
-    const bundlerUrl = process.env.BUNDLER_URL as string;
-    const nodeUrl = process.env.NODE_URL as string;
-
-    const eoaDelegatorPrivateKey = generatePrivateKey();
-    const eoaDelegatorPublicAddress = privateKeyToAccount(eoaDelegatorPrivateKey).address;
+    const { chainId, bundlerUrl, nodeUrl } = loadEnv()
+    const { publicAddress: eoaDelegatorPublicAddress, privateKey: eoaDelegatorPrivateKey } = getOrCreateOwner()
 
     // Initialize the smart account
     const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);

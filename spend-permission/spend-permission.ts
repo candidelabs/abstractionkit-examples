@@ -1,4 +1,4 @@
-import * as dotenv from 'dotenv'
+import { loadEnv, getOrCreateOwner, requireEnv } from '../utils/env'
 import {
     SafeAccountV0_3_0 as SafeAccount,
     AllowanceModule,
@@ -11,18 +11,11 @@ import { createPublicClient, http, parseAbi } from "viem";
 const ERC20_ABI = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
 
 async function main(): Promise<void> {
-    //get values from .env
-    dotenv.config()
-    const chainId = BigInt(process.env.CHAIN_ID as string);
-    const nodeUrl = process.env.NODE_URL as string;
-    const bundlerUrl = process.env.BUNDLER_URL as string;
-    const paymasterUrl = process.env.PAYMASTER_URL as string;
-    const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
-    const allowanceToken = process.env.TOKEN_ADDRESS as string;
+    const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
+    const allowanceToken = requireEnv('TOKEN_ADDRESS')
 
     // source account owner
-    const sourceOwnerPublicAddress = process.env.PUBLIC_ADDRESS as string;
-    const sourceOwnerPrivateKey = process.env.PRIVATE_KEY as string;
+    const { publicAddress: sourceOwnerPublicAddress, privateKey: sourceOwnerPrivateKey } = getOrCreateOwner()
 
     // delegate account owner
     const delegateOwnerPrivateKey = generatePrivateKey();

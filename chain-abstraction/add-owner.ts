@@ -13,7 +13,7 @@
  * Learn more: https://docs.candide.dev/account-abstraction/research/safe-unified-account
  */
 
-import * as dotenv from 'dotenv'
+import { loadMultiChainEnv, getOrCreateOwner } from '../utils/env'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import {
     ExperimentalSafeMultiChainSigAccount as SafeAccount,
@@ -22,20 +22,8 @@ import {
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    dotenv.config()
-
-    // Chain configuration - set in .env (see .env.example)
-    const chainId1 = BigInt(process.env.CHAIN_ID1 as string)
-    const chainId2 = BigInt(process.env.CHAIN_ID2 as string)
-    const bundlerUrl1 = process.env.BUNDLER_URL1 as string
-    const bundlerUrl2 = process.env.BUNDLER_URL2 as string
-    const nodeUrl1 = process.env.NODE_URL1 as string
-    const nodeUrl2 = process.env.NODE_URL2 as string
-
-    // Auto-generate keys if not provided (zero-setup for quick testing)
-    const ownerPrivateKey = (process.env.PRIVATE_KEY || generatePrivateKey()) as `0x${string}`
-    const ownerAccount = privateKeyToAccount(ownerPrivateKey)
-    const ownerPublicAddress = process.env.PUBLIC_ADDRESS || ownerAccount.address
+    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2 } = loadMultiChainEnv()
+    const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
 
     // Generate a new owner address to add
     const newOwnerAccount = privateKeyToAccount(generatePrivateKey())

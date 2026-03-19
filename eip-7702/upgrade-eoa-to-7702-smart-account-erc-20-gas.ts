@@ -1,4 +1,4 @@
-import * as dotenv from 'dotenv'
+import { loadEnv, getOrCreateOwner, requireEnv } from '../utils/env'
 import {
     Simple7702Account,
     getFunctionSelector,
@@ -8,16 +8,9 @@ import {
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    //get values from .env
-    dotenv.config()
-    const chainId = BigInt(process.env.CHAIN_ID as string)
-    const bundlerUrl = process.env.BUNDLER_URL as string
-    const nodeUrl = process.env.NODE_URL as string;
-    
-    const eoaDelegatorPublicAddress = process.env.PUBLIC_ADDRESS as string
-    const eoaDelegatorPrivateKey = process.env.PRIVATE_KEY as string
-    const paymasterUrl = process.env.PAYMASTER_URL as string;
-    const paymasterTokenAddress = process.env.TOKEN_ADDRESS as string;
+    const { chainId, bundlerUrl, nodeUrl, paymasterUrl } = loadEnv()
+    const { publicAddress: eoaDelegatorPublicAddress, privateKey: eoaDelegatorPrivateKey } = getOrCreateOwner()
+    const paymasterTokenAddress = requireEnv('TOKEN_ADDRESS')
 
     // initiate the smart account
     const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);
