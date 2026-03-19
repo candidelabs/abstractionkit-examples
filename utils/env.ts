@@ -29,7 +29,7 @@ export function requireEnv(key: string): string {
     const value = get(key)
     if (!value) {
         throw new Error(
-            `Missing environment variable: ${key}. Add it to .env (see CLAUDE.md for defaults).`
+            `Missing environment variable: ${key}. Add it to .env (see README.md for defaults).`
         )
     }
     return value
