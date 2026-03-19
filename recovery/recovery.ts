@@ -1,5 +1,4 @@
-import * as dotenv from 'dotenv'
-
+import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
     SafeAccountV0_3_0 as SafeAccount,
     calculateUserOperationMaxGasCost,
@@ -10,18 +9,8 @@ import {
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 async function main(): Promise<void> {
-    //get values from .env
-    dotenv.config()
-    const chainId = BigInt(process.env.CHAIN_ID as string)
-    const bundlerUrl = process.env.BUNDLER_URL as string
-    const nodeUrl = process.env.NODE_URL as string
-    const paymasterUrl = process.env.PAYMASTER_URL as string;
-    const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
-
-    const safeOwnerPrivateKey = generatePrivateKey();
-    const safeOwner = privateKeyToAccount(safeOwnerPrivateKey);
-    const ownerPublicAddress = process.env.PUBLIC_ADDRESS || safeOwner.address as string
-    const ownerPrivateKey = process.env.PRIVATE_KEY || safeOwnerPrivateKey as string
+    const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
+    const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
 
 
     const guardian = privateKeyToAccount(generatePrivateKey());

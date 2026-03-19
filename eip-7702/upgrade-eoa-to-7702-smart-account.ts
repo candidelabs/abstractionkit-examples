@@ -1,34 +1,15 @@
-import * as dotenv from 'dotenv'
+import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
     Simple7702Account,
     getFunctionSelector,
     createCallData,
-    sendJsonRpcRequest,
     createAndSignEip7702DelegationAuthorization,
+    CandidePaymaster,
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    //get values from .env
-    dotenv.config()
-    const chainId = BigInt(process.env.CHAIN_ID as string)
-    const bundlerUrl = process.env.BUNDLER_URL as string
-    const nodeUrl = process.env.NODE_URL as string;
-
-    const eoaDelegatorPublicAddress = process.env.PUBLIC_ADDRESS as string;
-    const eoaDelegatorPrivateKey = process.env.PRIVATE_KEY as string;
-
-    // check balance of EOA before executing the upgrade userOp
-    const balance = await sendJsonRpcRequest(
-        nodeUrl,
-        "eth_getBalance",
-        [eoaDelegatorPublicAddress, "latest",]
-    ) as string; 
-
-    if (BigInt(balance) === 0n) {
-        console.log("Please fund the EOA Address with a sufficient balance of the native token to proceed");
-        console.log("Address: ", eoaDelegatorPublicAddress);
-        return;
-    }
+    const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
+    const { publicAddress: eoaDelegatorPublicAddress, privateKey: eoaDelegatorPrivateKey } = getOrCreateOwner()
 
     // initiate the smart account
     const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);
@@ -74,6 +55,11 @@ async function main(): Promise<void> {
         BigInt(userOperation.eip7702Auth.nonce),
         eoaDelegatorPrivateKey
     )
+
+    const paymaster = new CandidePaymaster(paymasterUrl)
+    let [paymasterUserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
+        userOperation, bundlerUrl, sponsorshipPolicyId)
+    userOperation = paymasterUserOperation;
 
     userOperation.signature = smartAccount.signUserOperation(
         userOperation,

@@ -1,21 +1,16 @@
-import * as dotenv from 'dotenv'
-
+import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
     SafeAccountV0_3_0,
     MetaTransaction,
     calculateUserOperationMaxGasCost,
+    CandidePaymaster,
     getFunctionSelector,
     createCallData,
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    //get values from .env
-    dotenv.config()
-    const chainId = BigInt(process.env.CHAIN_ID as string)
-    const bundlerUrl = process.env.BUNDLER_URL as string
-    const nodeUrl = process.env.NODE_URL as string
-    const ownerPublicAddress = process.env.PUBLIC_ADDRESS as string
-    const ownerPrivateKey = process.env.PRIVATE_KEY as string
+    const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
+    const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
 
     //initializeNewAccount only needed when the smart account
     //have not been deployed yet for its first useroperation.
@@ -70,13 +65,15 @@ async function main(): Promise<void> {
             //    maxPriorityFeePerGasPercentageMultiplier:130
         }
     )
+
+    const paymaster = new CandidePaymaster(paymasterUrl)
+    let [paymasterUserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
+        userOperation, bundlerUrl, sponsorshipPolicyId)
+    userOperation = paymasterUserOperation;
+
     const cost = calculateUserOperationMaxGasCost(userOperation)
     console.log("This useroperation may cost upto : " + cost + " wei")
-    console.log(
-        "Please fund the sender account : " +
-        userOperation.sender +
-        " with more than " + cost + " wei"
-    )
+    console.log("This example uses a Candide paymaster to sponsor the useroperation, so there is no need to fund the sender account.")
 
     //Safe is a multisig that can have multiple owners/signers
     //signUserOperation will create a signature for the provided

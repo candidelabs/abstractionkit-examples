@@ -1,10 +1,8 @@
-import dotenv from 'dotenv'
+import { requireEnv } from '../utils/env'
 import { Bundler } from "abstractionkit";
 
 async function main(): Promise<void> {
-    dotenv.config()
-
-    const bundlerUrl = process.env.BUNDLER_URL as string;
+    const bundlerUrl = requireEnv('BUNDLER_URL')
     const bundler = new Bundler(bundlerUrl)
 
     //an example for using a bundler json rpc methods other than sendUserOperation and estimateUserOperationGas which is covered in another example

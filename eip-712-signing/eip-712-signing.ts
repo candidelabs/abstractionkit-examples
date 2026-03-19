@@ -14,9 +14,9 @@
  * - Uses formatEip712SingleSignatureToUseroperationSignature() to format the result
  */
 
-import * as dotenv from 'dotenv'
+import { loadEnv, getOrCreateOwner } from '../utils/env'
 import { createWalletClient, http } from 'viem'
-import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
+import { privateKeyToAccount } from 'viem/accounts'
 import {
     SafeAccountV0_3_0 as SafeAccount,
     MetaTransaction,
@@ -27,15 +27,9 @@ import {
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    dotenv.config()
-    const chainId = BigInt(process.env.CHAIN_ID as string)
-    const bundlerUrl = process.env.BUNDLER_URL as string
-    const nodeUrl = process.env.NODE_URL as string
-    const paymasterUrl = process.env.PAYMASTER_URL as string
-    const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string
-
-    const ownerPrivateKey = (process.env.PRIVATE_KEY || generatePrivateKey()) as `0x${string}`
-    const ownerAccount = privateKeyToAccount(ownerPrivateKey)
+    const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
+    const { privateKey: ownerPrivateKey } = getOrCreateOwner()
+    const ownerAccount = privateKeyToAccount(ownerPrivateKey as `0x${string}`)
 
     // Initialize account
     let smartAccount = SafeAccount.initializeNewAccount(

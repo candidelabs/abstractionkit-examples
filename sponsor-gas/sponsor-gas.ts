@@ -1,5 +1,4 @@
-import * as dotenv from 'dotenv'
-
+import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
     SafeAccountV0_3_0 as SafeAccount,
     MetaTransaction,
@@ -10,15 +9,8 @@ import {
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    //get values from .env
-    dotenv.config()
-    const chainId = BigInt(process.env.CHAIN_ID as string)
-    const bundlerUrl = process.env.BUNDLER_URL as string
-    const nodeUrl = process.env.NODE_URL as string
-    const ownerPublicAddress = process.env.PUBLIC_ADDRESS as string
-    const ownerPrivateKey = process.env.PRIVATE_KEY as string
-    const paymasterUrl = process.env.PAYMASTER_URL as string;
-    const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
+    const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
+    const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
 
     //initializeNewAccount only needed when the smart account
     //have not been deployed yet for its first useroperation.
