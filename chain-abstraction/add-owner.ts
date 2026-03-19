@@ -16,8 +16,8 @@
 import * as dotenv from 'dotenv'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import {
-    SafeMultiChainSigAccount as SafeAccount,
-    AllowAllPaymaster,
+    ExperimentalSafeMultiChainSigAccount as SafeAccount,
+    ExperimentalAllowAllParallelPaymaster,
     UserOperationV9,
 } from "abstractionkit";
 
@@ -47,7 +47,7 @@ async function main(): Promise<void> {
     console.log("\nOriginal owner:", ownerPublicAddress)
     console.log("New owner to add:", newOwnerAddress)
 
-    // Initialize SafeMultiChainSigAccount with c2Nonce for deterministic address
+    // Initialize ExperimentalSafeMultiChainSigAccount with c2Nonce for deterministic address
     const smartAccount = SafeAccount.initializeNewAccount(
         [ownerPublicAddress],
     )
@@ -63,8 +63,8 @@ async function main(): Promise<void> {
         1 // threshold
     );
 
-    // Set up AllowAllPaymaster for gas sponsorship
-    const paymaster = new AllowAllPaymaster();
+    // Set up ExperimentalAllowAllParallelPaymaster for gas sponsorship
+    const paymaster = new ExperimentalAllowAllParallelPaymaster();
 
     const [paymasterInitFields1, paymasterInitFields2] = await Promise.all([
         paymaster.getPaymasterFieldsInitValues(chainId1),
@@ -79,7 +79,7 @@ async function main(): Promise<void> {
             nodeUrl1,
             bundlerUrl1,
             {
-                ...paymasterInitFields1,
+                parallelPaymasterInitValues: paymasterInitFields1,
                 preVerificationGasPercentageMultiplier: 120
             }
         ),
@@ -88,7 +88,7 @@ async function main(): Promise<void> {
             nodeUrl2,
             bundlerUrl2,
             {
-                ...paymasterInitFields2,
+                parallelPaymasterInitValues: paymasterInitFields2,
                 preVerificationGasPercentageMultiplier: 120
             }
         ),

@@ -5,7 +5,9 @@ import {
     createCallData,
     sendJsonRpcRequest,
     createAndSignEip7702DelegationAuthorization,
+    ExperimentalAllowAllParallelPaymaster,
 } from "abstractionkit";
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 
 async function main(): Promise<void> {
     //get values from .env
@@ -14,21 +16,27 @@ async function main(): Promise<void> {
     const bundlerUrl = process.env.BUNDLER_URL as string
     const nodeUrl = process.env.NODE_URL as string;
 
-    const eoaDelegatorPublicAddress = process.env.PUBLIC_ADDRESS as string;
-    const eoaDelegatorPrivateKey = process.env.PRIVATE_KEY as string;
+    const eoaDelegatorPrivateKey = generatePrivateKey();
+    const eoaDelegator = privateKeyToAccount(eoaDelegatorPrivateKey);
+    const eoaDelegatorPublicAddress = eoaDelegator.address;
+
+    // const eoaDelegatorPublicAddress = process.env.PUBLIC_ADDRESS as string;
+    // const eoaDelegatorPrivateKey = process.env.PRIVATE_KEY as string;
+
+    const paymaster = new ExperimentalAllowAllParallelPaymaster();
 
     // check balance of EOA before executing the upgrade userOp
-    const balance = await sendJsonRpcRequest(
-        nodeUrl,
-        "eth_getBalance",
-        [eoaDelegatorPublicAddress, "latest",]
-    ) as string; 
+    // const balance = await sendJsonRpcRequest(
+    //     nodeUrl,
+    //     "eth_getBalance",
+    //     [eoaDelegatorPublicAddress, "latest",]
+    // ) as string;
 
-    if (BigInt(balance) === 0n) {
-        console.log("Please fund the EOA Address with a sufficient balance of the native token to proceed");
-        console.log("Address: ", eoaDelegatorPublicAddress);
-        return;
-    }
+    // if (BigInt(balance) === 0n) {
+    //     console.log("Please fund the EOA Address with a sufficient balance of the native token to proceed");
+    //     console.log("Address: ", eoaDelegatorPublicAddress);
+    //     return;
+    // }
 
     // initiate the smart account
     const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);
@@ -54,6 +62,9 @@ async function main(): Promise<void> {
         data: mintTransactionCallData,
     }
 
+    // Fetch paymaster init values concurrently
+    const paymasterInitFields = await paymaster.getPaymasterFieldsInitValues(chainId);
+
     let userOperation = await smartAccount.createUserOperation(
         [
             //You can batch multiple transactions to be executed in one useroperation.
@@ -62,7 +73,8 @@ async function main(): Promise<void> {
         nodeUrl, //the node rpc is used to fetch the current nonce and fetch gas prices.
         bundlerUrl, //the bundler rpc is used to estimate the gas limits.
         {
-            eip7702Auth:{
+            parallelPaymasterInitValues: paymasterInitFields,
+            eip7702Auth: {
                 chainId: chainId, // chainId at which the account will be upgraded
             }
         }

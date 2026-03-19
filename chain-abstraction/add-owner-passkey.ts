@@ -19,8 +19,8 @@ import * as dotenv from 'dotenv'
 import { hexToBytes, keccak256, toBytes, numberToBytes } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
 import {
-    SafeMultiChainSigAccount as SafeAccount,
-    AllowAllPaymaster,
+    ExperimentalSafeMultiChainSigAccount as SafeAccount,
+    ExperimentalAllowAllParallelPaymaster,
     WebauthnPublicKey,
     WebauthnSignatureData,
     SignerSignaturePair,
@@ -104,8 +104,8 @@ async function main(): Promise<void> {
         1
     );
 
-    // Set up AllowAllPaymaster for gas sponsorship
-    const paymaster = new AllowAllPaymaster();
+    // Set up ExperimentalAllowAllParallelPaymaster for gas sponsorship
+    const paymaster = new ExperimentalAllowAllParallelPaymaster();
 
     const [paymasterInitFields1, paymasterInitFields2] = await Promise.all([
         paymaster.getPaymasterFieldsInitValues(chainId1),
@@ -120,7 +120,7 @@ async function main(): Promise<void> {
             nodeUrl1,
             bundlerUrl1,
             {
-                ...paymasterInitFields1,
+                parallelPaymasterInitValues: paymasterInitFields1,
                 preVerificationGasPercentageMultiplier: 120,
                 verificationGasLimitPercentageMultiplier: 150,
             }
@@ -130,7 +130,7 @@ async function main(): Promise<void> {
             nodeUrl2,
             bundlerUrl2,
             {
-                ...paymasterInitFields2,
+                parallelPaymasterInitValues: paymasterInitFields2,
                 preVerificationGasPercentageMultiplier: 120,
                 verificationGasLimitPercentageMultiplier: 150,
             }
