@@ -1,6 +1,6 @@
 import * as dotenv from 'dotenv'
 import {
-    SafeAccountV0_2_0 as SafeAccount,
+    SafeAccountV0_3_0 as SafeAccount,
     AllowanceModule,
     CandidePaymaster,
     ZeroAddress

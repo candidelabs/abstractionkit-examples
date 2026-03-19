@@ -2,7 +2,7 @@
 
 These examples demonstrate chain abstraction using **Safe Unified Account**: **sign once, execute on many chains**.
 
-> **Note**: Safe Unified Account is exported as `SafeMultiChainSigAccount` in abstractionkit.
+> **Note**: Safe Unified Account is exported as `ExperimentalSafeMultiChainSigAccount` in abstractionkit.
 > Learn more: https://docs.candide.dev/account-abstraction/research/safe-unified-account
 
 ## The Problem
@@ -103,13 +103,13 @@ Optional (auto-generated if not provided):
 
 ## Gas Sponsorship
 
-All examples use `AllowAllPaymaster` for gas sponsorship, so you don't need to fund accounts with native tokens to run them. Note that the paymaster implementation will be upgraded in the future to allow the use of gas policies, similar to what is already in production at candide's instagas.
+All examples use `ExperimentalAllowAllParallelPaymaster` for gas sponsorship, so you don't need to fund accounts with native tokens to run them. Note that the paymaster implementation will be upgraded in the future to allow the use of gas policies, similar to what is already in production at candide's instagas.
 
 ## Key Code Pattern
 
 ```typescript
-// Safe Unified Account (exported as SafeMultiChainSigAccount)
-import { SafeMultiChainSigAccount as SafeAccount } from "abstractionkit";
+// Safe Unified Account (exported as ExperimentalSafeMultiChainSigAccount)
+import { ExperimentalSafeMultiChainSigAccount as SafeAccount } from "abstractionkit";
 
 // Create UserOperations concurrently
 const [userOp1, userOp2] = await Promise.all([
