@@ -1,116 +1,91 @@
-import * as dotenv from 'dotenv'
+import * as dotenv from "dotenv";
 import {
     Simple7702AccountV09 as Simple7702Account,
     getFunctionSelector,
     createCallData,
-    sendJsonRpcRequest,
     createAndSignEip7702DelegationAuthorization,
     ExperimentalAllowAllParallelPaymaster,
 } from "abstractionkit";
-import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 async function main(): Promise<void> {
-    //get values from .env
-    dotenv.config()
-    const chainId = BigInt(process.env.CHAIN_ID as string)
-    const bundlerUrl = process.env.BUNDLER_URL as string
+    dotenv.config();
+    const chainId = BigInt(process.env.CHAIN_ID as string);
+    const bundlerUrl = process.env.BUNDLER_URL as string;
     const nodeUrl = process.env.NODE_URL as string;
 
     const eoaDelegatorPrivateKey = generatePrivateKey();
-    const eoaDelegator = privateKeyToAccount(eoaDelegatorPrivateKey);
-    const eoaDelegatorPublicAddress = eoaDelegator.address;
+    const eoaDelegatorPublicAddress = privateKeyToAccount(eoaDelegatorPrivateKey).address;
 
-    // const eoaDelegatorPublicAddress = process.env.PUBLIC_ADDRESS as string;
-    // const eoaDelegatorPrivateKey = process.env.PRIVATE_KEY as string;
-
-    const paymaster = new ExperimentalAllowAllParallelPaymaster();
-
-    // check balance of EOA before executing the upgrade userOp
-    // const balance = await sendJsonRpcRequest(
-    //     nodeUrl,
-    //     "eth_getBalance",
-    //     [eoaDelegatorPublicAddress, "latest",]
-    // ) as string;
-
-    // if (BigInt(balance) === 0n) {
-    //     console.log("Please fund the EOA Address with a sufficient balance of the native token to proceed");
-    //     console.log("Address: ", eoaDelegatorPublicAddress);
-    //     return;
-    // }
-
-    // initiate the smart account
+    // Initialize the smart account
     const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);
 
-    // We will be mitting two random NFTs in a single txs
+    // Create a mint transaction — we'll batch two of these in a single UserOperation
     const nftContractAddress = "0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336";
-    const mintFunctionSignature = 'mint(address)';
-    const mintFunctionSelector = getFunctionSelector(mintFunctionSignature);
-    const mintTransactionCallData = createCallData(
-        mintFunctionSelector,
-        ["address"],
-        [smartAccount.accountAddress]
-    );
-    const transaction1 = {
+    const mintFunctionSelector = getFunctionSelector("mint(address)");
+    const mintTransaction = {
         to: nftContractAddress,
         value: 0n,
-        data: mintTransactionCallData,
-    }
+        data: createCallData(
+            mintFunctionSelector,
+            ["address"],
+            [smartAccount.accountAddress],
+        ),
+    };
 
-    const transaction2 = {
-        to: nftContractAddress,
-        value: 0n,
-        data: mintTransactionCallData,
-    }
-
-    // Fetch paymaster init values concurrently
+    // Fetch paymaster init values
+    const paymaster = new ExperimentalAllowAllParallelPaymaster();
     const paymasterInitFields = await paymaster.getPaymasterFieldsInitValues(chainId);
 
-    let userOperation = await smartAccount.createUserOperation(
-        [
-            //You can batch multiple transactions to be executed in one useroperation.
-            transaction1, transaction2,
-        ],
-        nodeUrl, //the node rpc is used to fetch the current nonce and fetch gas prices.
-        bundlerUrl, //the bundler rpc is used to estimate the gas limits.
+    const userOperation = await smartAccount.createUserOperation(
+        [mintTransaction, mintTransaction],
+        nodeUrl,
+        bundlerUrl,
         {
             parallelPaymasterInitValues: paymasterInitFields,
             eip7702Auth: {
-                chainId: chainId, // chainId at which the account will be upgraded
-            }
-        }
+                chainId: chainId,
+            },
+        },
     );
 
     userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
         BigInt(userOperation.eip7702Auth.chainId),
         userOperation.eip7702Auth.address,
         BigInt(userOperation.eip7702Auth.nonce),
-        eoaDelegatorPrivateKey
-    )
-
-    userOperation.signature = smartAccount.signUserOperation(
-        userOperation,
         eoaDelegatorPrivateKey,
-        chainId,
     );
 
-    console.log("userOperation: ", userOperation)
+    const [signature, paymasterData] = await Promise.all([
+        smartAccount.signUserOperation(
+            userOperation,
+            eoaDelegatorPrivateKey,
+            chainId,
+        ),
+        paymaster.getApprovedPaymasterData(userOperation),
+    ]);
 
-    let sendUserOperationResponse = await smartAccount.sendUserOperation(
-        userOperation, bundlerUrl
+    userOperation.signature = signature;
+    userOperation.paymasterData = paymasterData;
+
+    console.log("UserOperation:", userOperation);
+
+    const sendUserOperationResponse = await smartAccount.sendUserOperation(
+        userOperation, bundlerUrl,
     );
 
-    console.log("userOp sent! Waiting for inclusion...");
-    console.log("userOp Hash: ", sendUserOperationResponse.userOperationHash);
+    console.log("UserOp sent! Waiting for inclusion...");
+    console.log("UserOp hash:", sendUserOperationResponse.userOperationHash);
 
-    let userOperationReceiptResult = await sendUserOperationResponse.included();
+    const userOperationReceiptResult = await sendUserOperationResponse.included();
 
-    console.log("Useroperation receipt received.")
-    console.log(userOperationReceiptResult)
+    console.log("UserOperation receipt received.");
+    console.log(userOperationReceiptResult);
     if (userOperationReceiptResult.success) {
-        console.log("EOA upgraded to a Smart Account and minted two Nfts! The transaction hash is : " + userOperationReceiptResult.receipt.transactionHash)
+        console.log("EOA upgraded to a Smart Account and minted two NFTs! Transaction hash: " + userOperationReceiptResult.receipt.transactionHash);
     } else {
-        console.log("Useroperation execution failed")
+        console.log("UserOperation execution failed");
     }
 }
 
-main()
+main().catch(console.error);
