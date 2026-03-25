@@ -63,9 +63,9 @@ npx ts-node <folder>/<script>.ts
 | EIP-712 signed UserOp | `eip-712-signing/` | `eip-712-signing.ts` |
 | Nested Safe accounts | `nested-safe-accounts/` | `nested-safe-accounts.ts` |
 | Spending limits | `spend-permission/` | `spend-permission.ts` |
-| Calibur 7702 upgrade EOA + gas sponsorship | `calibur-7702/` | `upgrade-eoa.ts` |
-| Calibur 7702 passkeys | `calibur-7702/` | `passkeys.ts` |
-| Calibur 7702 key management | `calibur-7702/` | `manage-keys.ts` |
+| Calibur 7702 upgrade EOA + gas sponsorship | `eip-7702/calibur-account/` | `01-upgrade-eoa.ts` |
+| Calibur 7702 passkeys | `eip-7702/calibur-account/` | `02-passkeys.ts` |
+| Calibur 7702 key management | `eip-7702/calibur-account/` | `03-manage-keys.ts` |
 
 ## Environment Variables
 

@@ -198,14 +198,9 @@ export class WebAuthnCredentials {
 
         const signedData = Buffer.concat([authenticatorData, clientDataHash])
 
-        // Sign with P-256 using ieee-p1363 encoding (raw r||s format)
-        const signature = crypto.sign(null, signedData, {
-            key: credential.keyPair.privateKey,
-            dsaEncoding: 'ieee-p1363',
-        })
-
-        // Convert to DER for standard WebAuthn format
-        const derSignature = crypto.sign(null, signedData, {
+        // Sign with P-256 / SHA-256 (ES256)
+        // DER encoding is the standard WebAuthn assertion signature format
+        const signature = crypto.sign('sha256', signedData, {
             key: credential.keyPair.privateKey,
             dsaEncoding: 'der',
         })
@@ -216,7 +211,7 @@ export class WebAuthnCredentials {
             response: {
                 clientDataJSON: b2ab(Buffer.from(clientDataJSON)),
                 authenticatorData: b2ab(authenticatorData),
-                signature: b2ab(derSignature),
+                signature: b2ab(signature),
                 userHandle: credential.user,
             },
             type: 'public-key',

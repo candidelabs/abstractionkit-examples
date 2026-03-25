@@ -2,14 +2,14 @@
 
 ## What is Calibur?
 
-[Calibur](https://github.com/Uniswap/calibur) is a smart account implementation by Uniswap built for [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702). It turns any existing EOA into a full featured smart account through delegation. Your address stays the same, but gains new capabilities:
+[Calibur](https://github.com/Uniswap/calibur) is a smart account implementation by Uniswap built for [EIP-7702](https://eips.ethereum.org/EIPS/eip-7702). It turns any existing EOA into a full-featured smart account through delegation. Your address stays the same, but gains new capabilities:
 
-- **Multikey support** — Register multiple signing keys (EOA, passkey, raw P-256) with per-key settings
-- **WebAuthn / Passkeys** — Native support for biometric authentication (Face ID, fingerprint, security keys)
-- **Key expiration** — Set time limited keys for session based access
-- **Per key hooks** — Attach custom validation logic to individual keys
+- **Multi-key support** — Register multiple signing keys (EOA, passkey, raw P-256) with per-key settings
+- **WebAuthn/Passkeys** — Native support for biometric authentication (Face ID, fingerprint, security keys)
+- **Key expiration** — Set time-limited keys for session-based access
+- **Per-key hooks** — Attach custom validation logic to individual keys
 - **Transaction batching** — Execute multiple calls in a single UserOperation
-- **Admin / non-admin separation** — Only admin keys can manage the account's key configuration; non-admin keys can only sign regular transactions
+- **Admin/non-admin separation** — Only admin keys can manage the account's key configuration; non-admin keys can only sign regular transactions
 
 ## EntryPoint Versions
 
@@ -59,4 +59,4 @@ npx ts-node eip-7702/calibur-account/03-manage-keys.ts
 
 ## WebAuthn Note
 
-The `webauthn.ts` file provides a simulated WebAuthn authenticator for Node.js. In a real browser application, replace it with the native `navigator.credentials` API — the Calibur signing flow (key registration, `createUserOperationHash`, `formatWebAuthnSignature`) remains the same.
+The `webauthn-utils.ts` file provides a simulated WebAuthn authenticator for Node.js. In a real browser application, replace it with the native `navigator.credentials` API — the Calibur signing flow (key registration, `getUserOperationHash`, `formatWebAuthnSignature`) remains the same.
