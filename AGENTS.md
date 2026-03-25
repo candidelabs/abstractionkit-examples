@@ -63,6 +63,9 @@ npx ts-node <folder>/<script>.ts
 | EIP-712 signed UserOp | `eip-712-signing/` | `eip-712-signing.ts` |
 | Nested Safe accounts | `nested-safe-accounts/` | `nested-safe-accounts.ts` |
 | Spending limits | `spend-permission/` | `spend-permission.ts` |
+| Calibur 7702 upgrade EOA + gas sponsorship | `calibur-7702/` | `upgrade-eoa.ts` |
+| Calibur 7702 passkeys | `calibur-7702/` | `passkeys.ts` |
+| Calibur 7702 key management | `calibur-7702/` | `manage-keys.ts` |
 
 ## Environment Variables
 
@@ -161,6 +164,7 @@ const receipt = await response.included();
 | `SafeAccountV0_2_0` | Legacy/v0.6 compatibility | v0.6 |
 | `Simple7702Account` | EIP-7702 delegation | v0.8 |
 | `ExperimentalSafeMultiChainSigAccount` | Chain abstraction (Safe Unified Account) | v0.9 |
+| `Calibur7702Account` | EIP-7702 Calibur (passkeys, key mgmt) | v0.8 (default) |
 
 ## Common Commands
 
