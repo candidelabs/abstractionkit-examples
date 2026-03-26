@@ -5,13 +5,7 @@ import {
     createCallData,
     createAndSignEip7702DelegationAuthorization,
     CandidePaymaster,
-    // Uncomment these imports if using viem wallet client signing (see below)
-    // createEip7702DelegationAuthorizationHash,
-    // createUserOperationHash,
 } from "abstractionkit";
-// Uncomment these imports if using viem wallet client signing (see below)
-// import { sign } from "viem/accounts";
-// import { createPublicClient, http, toHex } from "viem";
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
@@ -55,7 +49,6 @@ async function main(): Promise<void> {
         }
     );
 
-    // --- Option A: Sign delegation with private key (default) ---
     userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
         BigInt(userOperation.eip7702Auth.chainId),
         userOperation.eip7702Auth.address,
@@ -63,59 +56,17 @@ async function main(): Promise<void> {
         eoaDelegatorPrivateKey
     )
 
-    // --- Option B: Sign delegation with viem wallet client ---
-    // Useful when signing is handled externally (hardware wallet, external signer).
-    // Uncomment this block and the viem imports above, and comment out Option A.
-    //
-    // const client = createPublicClient({ transport: http(nodeUrl) });
-    // const nonce = await client.getTransactionCount({ address: eoaDelegatorPublicAddress as `0x${string}` });
-    //
-    // const eip7702DelegationAuthorizationHash = createEip7702DelegationAuthorizationHash(
-    //     chainId,
-    //     smartAccount.delegateeAddress,
-    //     BigInt(nonce)
-    // );
-    //
-    // const delegationSig = await sign({
-    //     hash: eip7702DelegationAuthorizationHash as `0x${string}`,
-    //     privateKey: eoaDelegatorPrivateKey as `0x${string}`
-    // });
-    //
-    // userOperation.eip7702Auth = {
-    //     chainId: toHex(chainId),
-    //     address: smartAccount.delegateeAddress,
-    //     nonce: toHex(nonce),
-    //     yParity: toHex(delegationSig.v === 27n ? 0 : 1),
-    //     r: delegationSig.r,
-    //     s: delegationSig.s
-    // };
-
     // Sponsor gas with paymaster
     const paymaster = new CandidePaymaster(paymasterUrl);
     let [paymasterUserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
         userOperation, bundlerUrl, sponsorshipPolicyId)
     userOperation = paymasterUserOperation;
 
-    // --- Option A: Sign UserOperation with private key (default) ---
     userOperation.signature = smartAccount.signUserOperation(
         userOperation,
         eoaDelegatorPrivateKey,
         chainId,
     );
-
-    // --- Option B: Sign UserOperation with viem wallet client ---
-    // Uncomment this block and comment out Option A above.
-    //
-    // const userOperationHash = createUserOperationHash(
-    //     userOperation,
-    //     smartAccount.entrypointAddress,
-    //     chainId,
-    // );
-    // userOperation.signature = await sign({
-    //     hash: userOperationHash as `0x${string}`,
-    //     privateKey: eoaDelegatorPrivateKey as `0x${string}`,
-    //     to: 'hex'
-    // });
 
     console.log("UserOperation:", userOperation)
 

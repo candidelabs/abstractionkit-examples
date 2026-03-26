@@ -1,12 +1,13 @@
 import { loadEnv, getOrCreateOwner } from '../../utils/env'
 import { Simple7702Account } from "abstractionkit";
-import { createPublicClient, http } from "viem";
+import { createPublicClient, http, formatEther } from "viem";
 
 async function main(): Promise<void> {
     const { nodeUrl } = loadEnv()
     const { publicAddress: eoaDelegatorPublicAddress, privateKey: eoaDelegatorPrivateKey } = getOrCreateOwner()
 
     const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);
+    const client = createPublicClient({ transport: http(nodeUrl) });
 
     // Check if the EOA is currently delegated
     const isDelegated = await smartAccount.isDelegatedToThisAccount(nodeUrl);
@@ -16,7 +17,17 @@ async function main(): Promise<void> {
         return;
     }
 
-    console.log("EOA " + eoaDelegatorPublicAddress + " is delegated. Revoking delegation...");
+    // Revocation is a regular transaction — the EOA pays gas with native tokens
+    const balance = await client.getBalance({ address: eoaDelegatorPublicAddress as `0x${string}` });
+
+    if (balance === 0n) {
+        console.log("EOA " + eoaDelegatorPublicAddress + " has no native token balance to pay for gas.");
+        console.log("Please fund the EOA before revoking delegation.");
+        return;
+    }
+
+    console.log("EOA " + eoaDelegatorPublicAddress + " is delegated. Balance: " + formatEther(balance) + " ETH");
+    console.log("Revoking delegation...");
 
     // Create and sign a revocation transaction (delegates to address zero)
     const signedTransaction = await smartAccount.createRevokeDelegationTransaction(
@@ -25,7 +36,6 @@ async function main(): Promise<void> {
     );
 
     // Send the raw transaction
-    const client = createPublicClient({ transport: http(nodeUrl) });
     const txHash = await client.request({
         method: 'eth_sendRawTransaction',
         params: [signedTransaction as `0x${string}`],

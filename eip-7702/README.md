@@ -7,10 +7,11 @@ These examples demonstrate how to upgrade an EOA to a Smart Account with EIP-770
 ```
 eip-7702/
 ├── simple-account/       # Simple7702Account examples
-│   ├── upgrade-eoa.ts            # Upgrade EOA + batch mint NFTs (sponsored gas)
-│   ├── revoke-delegation.ts      # Revoke EIP-7702 delegation
-│   ├── upgrade-eoa-erc20-gas.ts  # Upgrade EOA with ERC-20 token gas payment
-│   └── upgrade-eoa-ep-v09.ts     # Upgrade EOA using EntryPoint v0.9
+│   ├── 01-upgrade-eoa.ts                 # Upgrade EOA + batch mint NFTs (sponsored gas)
+│   ├── 02-upgrade-eoa-erc20-gas.ts       # Upgrade EOA with ERC-20 token gas payment
+│   ├── 03-upgrade-eoa-ep-v09.ts          # Upgrade EOA using EntryPoint v0.9
+│   ├── 04-revoke-delegation.ts           # Revoke EIP-7702 delegation
+│   └── 05-upgrade-eoa-external-signer.ts # Upgrade EOA with external signer (viem WalletClient)
 └── calibur-account/      # Calibur7702Account examples (passkeys, key management)
     ├── 01-upgrade-eoa.ts
     ├── 02-passkeys.ts
@@ -46,6 +47,8 @@ let userOperation = await smartAccount.createUserOperation(
 
 ### Signing the Delegation Authorization
 
+With a private key:
+
 ```ts
 userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
     BigInt(userOperation.eip7702Auth.chainId),
@@ -54,6 +57,22 @@ userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
     eoaDelegatorPrivateKey
 )
 ```
+
+With an external signer (callback pattern):
+
+```ts
+userOperation.eip7702Auth = await createAndSignEip7702DelegationAuthorization(
+    BigInt(userOperation.eip7702Auth.chainId),
+    userOperation.eip7702Auth.address,
+    BigInt(userOperation.eip7702Auth.nonce),
+    async (hash: string) => {
+        // Any signer — hardware wallet, WalletConnect, browser extension, etc.
+        return await walletClient.signMessage({ message: { raw: hash as `0x${string}` } });
+    }
+)
+```
+
+See `simple-account/02-upgrade-eoa-external-signer.ts` for the full example.
 
 ### Revoking Delegation
 
@@ -66,7 +85,7 @@ const signedTransaction = await smartAccount.createRevokeDelegationTransaction(
 );
 ```
 
-This creates a signed transaction that delegates to address zero, effectively removing the smart account code from the EOA. See `simple-account/revoke-delegation.ts` for the full example.
+This creates a signed transaction that delegates to address zero, effectively removing the smart account code from the EOA. See `simple-account/05-revoke-delegation.ts` for the full example.
 
 ## Gas Sponsorship with Paymaster
 
