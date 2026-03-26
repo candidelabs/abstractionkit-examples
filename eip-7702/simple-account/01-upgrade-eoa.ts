@@ -5,41 +5,38 @@ import {
     createCallData,
     createAndSignEip7702DelegationAuthorization,
     CandidePaymaster,
-} from "abstractionkit";
+} from "abstractionkit"
+
+// Upgrades an EOA to a Simple7702 smart account with gas sponsorship,
+// then batch-mints two NFTs in a single UserOperation.
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
     const { publicAddress: eoaDelegatorPublicAddress, privateKey: eoaDelegatorPrivateKey } = getOrCreateOwner()
 
-    // Initialize the smart account
-    const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 1: Initialize smart account and build transactions
+    // ──────────────────────────────────────────────────────────────────────
+    // We'll batch-mint two NFTs in a single UserOperation to demonstrate
+    // the smart account's batching capability.
+    const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress)
 
-    // We will be minting two random NFTs in a single UserOperation
-    const nftContractAddress = "0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336";
-    const mintFunctionSelector = getFunctionSelector('mint(address)');
-    const mintTransactionCallData = createCallData(
+    const nftContractAddress = "0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336"
+    const mintFunctionSelector = getFunctionSelector('mint(address)')
+    const mintCallData = createCallData(
         mintFunctionSelector,
         ["address"],
-        [smartAccount.accountAddress]
-    );
+        [eoaDelegatorPublicAddress],
+    )
 
-    const transaction1 = {
-        to: nftContractAddress,
-        value: 0n,
-        data: mintTransactionCallData,
-    }
+    const mintNft1 = { to: nftContractAddress, value: 0n, data: mintCallData }
+    const mintNft2 = { to: nftContractAddress, value: 0n, data: mintCallData }
 
-    const transaction2 = {
-        to: nftContractAddress,
-        value: 0n,
-        data: mintTransactionCallData,
-    }
-
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 2: Create UserOperation with EIP-7702 authorization
+    // ──────────────────────────────────────────────────────────────────────
     let userOperation = await smartAccount.createUserOperation(
-        [
-            // You can batch multiple transactions to be executed in one UserOperation
-            transaction1, transaction2,
-        ],
+        [mintNft1, mintNft2],
         nodeUrl,
         bundlerUrl,
         {
@@ -47,8 +44,11 @@ async function main(): Promise<void> {
                 chainId: chainId,
             }
         }
-    );
+    )
 
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 3: Sign EIP-7702 delegation authorization
+    // ──────────────────────────────────────────────────────────────────────
     userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
         BigInt(userOperation.eip7702Auth.chainId),
         userOperation.eip7702Auth.address,
@@ -56,33 +56,41 @@ async function main(): Promise<void> {
         eoaDelegatorPrivateKey
     )
 
-    // Sponsor gas with paymaster
-    const paymaster = new CandidePaymaster(paymasterUrl);
-    let [paymasterUserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 4: Sponsor gas with paymaster
+    // ──────────────────────────────────────────────────────────────────────
+    const paymaster = new CandidePaymaster(paymasterUrl)
+    let [paymasterUserOperation] = await paymaster.createSponsorPaymasterUserOperation(
         userOperation, bundlerUrl, sponsorshipPolicyId)
-    userOperation = paymasterUserOperation;
+    userOperation = paymasterUserOperation
 
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 5: Sign UserOperation
+    // ──────────────────────────────────────────────────────────────────────
     userOperation.signature = smartAccount.signUserOperation(
         userOperation,
         eoaDelegatorPrivateKey,
         chainId,
-    );
+    )
 
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 6: Send and wait for inclusion
+    // ──────────────────────────────────────────────────────────────────────
     console.log("UserOperation:", userOperation)
 
-    let sendUserOperationResponse = await smartAccount.sendUserOperation(
+    const sendUserOperationResponse = await smartAccount.sendUserOperation(
         userOperation, bundlerUrl
-    );
+    )
 
-    console.log("UserOp sent! Waiting for inclusion...");
-    console.log("UserOp hash:", sendUserOperationResponse.userOperationHash);
+    console.log("UserOp sent! Waiting for inclusion...")
+    console.log("UserOp hash:", sendUserOperationResponse.userOperationHash)
 
-    let userOperationReceiptResult = await sendUserOperationResponse.included();
+    const receipt = await sendUserOperationResponse.included()
 
     console.log("UserOperation receipt received.")
-    console.log(userOperationReceiptResult)
-    if (userOperationReceiptResult.success) {
-        console.log("EOA upgraded to a Smart Account and minted two NFTs! Transaction hash: " + userOperationReceiptResult.receipt.transactionHash)
+    console.log(receipt)
+    if (receipt.success) {
+        console.log("EOA upgraded to a Smart Account and minted two NFTs! Transaction hash: " + receipt.receipt.transactionHash)
     } else {
         console.log("UserOperation execution failed")
     }

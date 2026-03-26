@@ -6,57 +6,48 @@ import {
     createAndSignEip7702DelegationAuthorization,
     createUserOperationHash,
     CandidePaymaster,
-} from "abstractionkit";
-import { privateKeyToAccount } from "viem/accounts";
+} from "abstractionkit"
+import { privateKeyToAccount } from "viem/accounts"
 
-// This example demonstrates upgrading an EOA to a 7702 smart account using
-// an external signer via abstractionkit's callback pattern. The delegation
-// authorization and UserOperation are signed through a viem Account, which
-// can be backed by any signer (hardware wallet, WalletConnect, browser
-// extension, etc.). Here we use privateKeyToAccount for demonstration, but
-// it can be swapped for any viem account adapter (e.g. toAccount() for
-// custom signers).
-//
-// Key difference from 01-upgrade-eoa.ts: signing uses account.sign() (raw
-// hash signing) instead of passing private keys directly to abstractionkit.
+// Same as 01-upgrade-eoa.ts, but signing uses abstractionkit's callback
+// pattern with a viem Account instead of passing private keys directly.
+// The Account can be swapped for any viem adapter (hardware wallet,
+// WalletConnect, browser extension, custom signer via toAccount()).
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
     const { publicAddress: eoaDelegatorPublicAddress, privateKey: eoaDelegatorPrivateKey } = getOrCreateOwner()
 
-    // Create a viem Account — replace privateKeyToAccount with your
-    // preferred account adapter (e.g. toAccount() for custom signers)
-    const account = privateKeyToAccount(eoaDelegatorPrivateKey as `0x${string}`);
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 1: Create a viem Account (the external signer)
+    // ──────────────────────────────────────────────────────────────────────
+    // Replace privateKeyToAccount with any viem account adapter:
+    //   - toAccount() for custom signers
+    //   - JSON-RPC account for browser wallets
+    //   - Hardware wallet adapter
+    const account = privateKeyToAccount(eoaDelegatorPrivateKey as `0x${string}`)
 
-    // Initialize the smart account
-    const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 2: Initialize smart account and build transactions
+    // ──────────────────────────────────────────────────────────────────────
+    const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress)
 
-    // We will be minting two random NFTs in a single UserOperation
-    const nftContractAddress = "0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336";
-    const mintFunctionSelector = getFunctionSelector('mint(address)');
-    const mintTransactionCallData = createCallData(
+    const nftContractAddress = "0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336"
+    const mintFunctionSelector = getFunctionSelector('mint(address)')
+    const mintCallData = createCallData(
         mintFunctionSelector,
         ["address"],
-        [smartAccount.accountAddress]
-    );
+        [eoaDelegatorPublicAddress],
+    )
 
-    const transaction1 = {
-        to: nftContractAddress,
-        value: 0n,
-        data: mintTransactionCallData,
-    }
+    const mintNft1 = { to: nftContractAddress, value: 0n, data: mintCallData }
+    const mintNft2 = { to: nftContractAddress, value: 0n, data: mintCallData }
 
-    const transaction2 = {
-        to: nftContractAddress,
-        value: 0n,
-        data: mintTransactionCallData,
-    }
-
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 3: Create UserOperation with EIP-7702 authorization
+    // ──────────────────────────────────────────────────────────────────────
     let userOperation = await smartAccount.createUserOperation(
-        [
-            // You can batch multiple transactions to be executed in one UserOperation
-            transaction1, transaction2,
-        ],
+        [mintNft1, mintNft2],
         nodeUrl,
         bundlerUrl,
         {
@@ -64,54 +55,61 @@ async function main(): Promise<void> {
                 chainId: chainId,
             }
         }
-    );
+    )
 
-    // Sign delegation using abstractionkit's signer callback.
-    // The callback receives the raw authorization hash and returns the signature.
-    // This decouples signing from key management — any signer can be plugged in.
-    // Important: use account.sign() for raw hash signing, NOT signMessage()
-    // which adds an EIP-191 prefix and produces a different recovered address.
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 4: Sign delegation with signer callback
+    // ──────────────────────────────────────────────────────────────────────
+    // The callback receives the raw authorization hash and returns a signature.
+    // Use account.sign() for raw signing — NOT signMessage(), which adds an
+    // EIP-191 prefix and produces a different recovered address.
     userOperation.eip7702Auth = await createAndSignEip7702DelegationAuthorization(
         BigInt(userOperation.eip7702Auth.chainId),
         userOperation.eip7702Auth.address,
         BigInt(userOperation.eip7702Auth.nonce),
         async (hash: string) => {
-            const sig = await account.sign({ hash: hash as `0x${string}` });
-            return sig;
+            return await account.sign({ hash: hash as `0x${string}` })
         }
     )
 
-    // Sponsor gas with paymaster
-    const paymaster = new CandidePaymaster(paymasterUrl);
-    let [paymasterUserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 5: Sponsor gas with paymaster
+    // ──────────────────────────────────────────────────────────────────────
+    const paymaster = new CandidePaymaster(paymasterUrl)
+    let [paymasterUserOperation] = await paymaster.createSponsorPaymasterUserOperation(
         userOperation, bundlerUrl, sponsorshipPolicyId)
-    userOperation = paymasterUserOperation;
+    userOperation = paymasterUserOperation
 
-    // Sign UserOperation using the same external signer pattern.
-    // createUserOperationHash produces the hash, then sign it with account.sign().
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 6: Sign UserOperation with external signer
+    // ──────────────────────────────────────────────────────────────────────
+    // createUserOperationHash produces the hash, then sign it raw.
     const userOperationHash = createUserOperationHash(
         userOperation,
         smartAccount.entrypointAddress,
         chainId,
-    );
+    )
 
-    userOperation.signature = await account.sign({ hash: userOperationHash as `0x${string}` });
+    userOperation.signature = await account.sign({ hash: userOperationHash as `0x${string}` })
 
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 7: Send and wait for inclusion
+    // ──────────────────────────────────────────────────────────────────────
     console.log("UserOperation:", userOperation)
 
-    let sendUserOperationResponse = await smartAccount.sendUserOperation(
+    const sendUserOperationResponse = await smartAccount.sendUserOperation(
         userOperation, bundlerUrl
-    );
+    )
 
-    console.log("UserOp sent! Waiting for inclusion...");
-    console.log("UserOp hash:", sendUserOperationResponse.userOperationHash);
+    console.log("UserOp sent! Waiting for inclusion...")
+    console.log("UserOp hash:", sendUserOperationResponse.userOperationHash)
 
-    let userOperationReceiptResult = await sendUserOperationResponse.included();
+    const receipt = await sendUserOperationResponse.included()
 
     console.log("UserOperation receipt received.")
-    console.log(userOperationReceiptResult)
-    if (userOperationReceiptResult.success) {
-        console.log("EOA upgraded to a Smart Account and minted two NFTs! Transaction hash: " + userOperationReceiptResult.receipt.transactionHash)
+    console.log(receipt)
+    if (receipt.success) {
+        console.log("EOA upgraded to a Smart Account and minted two NFTs! Transaction hash: " + receipt.receipt.transactionHash)
     } else {
         console.log("UserOperation execution failed")
     }

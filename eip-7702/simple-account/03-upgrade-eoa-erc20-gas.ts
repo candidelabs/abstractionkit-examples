@@ -5,51 +5,49 @@ import {
     createCallData,
     createAndSignEip7702DelegationAuthorization,
     CandidePaymaster,
-} from "abstractionkit";
+} from "abstractionkit"
+
+// Same as 01-upgrade-eoa.ts, but gas is paid with an ERC-20 token
+// instead of being sponsored by a paymaster policy.
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl } = loadEnv()
     const { publicAddress: eoaDelegatorPublicAddress, privateKey: eoaDelegatorPrivateKey } = getOrCreateOwner()
-    const paymasterTokenAddress = requireEnv('TOKEN_ADDRESS')
+    const tokenAddress = requireEnv('TOKEN_ADDRESS')
 
-    // initiate the smart account
-    const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 1: Initialize smart account and build transactions
+    // ──────────────────────────────────────────────────────────────────────
+    const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress)
 
-    // We will be mitting two random NFTs in a single txs
-    const nftContractAddress = "0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336";
-    const mintFunctionSignature = 'mint(address)';
-    const mintFunctionSelector = getFunctionSelector(mintFunctionSignature);
-    const mintTransactionCallData = createCallData(
+    const nftContractAddress = "0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336"
+    const mintFunctionSelector = getFunctionSelector('mint(address)')
+    const mintCallData = createCallData(
         mintFunctionSelector,
         ["address"],
-        [smartAccount.accountAddress]
-    );
-    const transaction1 = {
-        to: nftContractAddress,
-        value: 0n,
-        data: mintTransactionCallData,
-    }
+        [eoaDelegatorPublicAddress],
+    )
 
-    const transaction2 = {
-        to: nftContractAddress,
-        value: 0n,
-        data: mintTransactionCallData,
-    }
+    const mintNft1 = { to: nftContractAddress, value: 0n, data: mintCallData }
+    const mintNft2 = { to: nftContractAddress, value: 0n, data: mintCallData }
 
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 2: Create UserOperation with EIP-7702 authorization
+    // ──────────────────────────────────────────────────────────────────────
     let userOperation = await smartAccount.createUserOperation(
-        [
-            //You can batch multiple transactions to be executed in one useroperation.
-            transaction1, transaction2,
-        ],
-        nodeUrl, //the node rpc is used to fetch the current nonce and fetch gas prices.
-        bundlerUrl, //the bundler rpc is used to estimate the gas limits.
+        [mintNft1, mintNft2],
+        nodeUrl,
+        bundlerUrl,
         {
-            eip7702Auth:{
-                chainId: chainId, // chainId at which the account will be upgraded
+            eip7702Auth: {
+                chainId: chainId,
             }
         }
-    );
-    
+    )
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 3: Sign EIP-7702 delegation authorization
+    // ──────────────────────────────────────────────────────────────────────
     userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
         BigInt(userOperation.eip7702Auth.chainId),
         userOperation.eip7702Auth.address,
@@ -57,62 +55,66 @@ async function main(): Promise<void> {
         eoaDelegatorPrivateKey
     )
 
-    
-    const paymaster = new CandidePaymaster(paymasterUrl);
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 4: Pay gas with ERC-20 token via token paymaster
+    // ──────────────────────────────────────────────────────────────────────
+    // Requires a Candide Paymaster URL from https://dashboard.candide.dev/
+    // and a TOKEN_ADDRESS in .env. Visit Discord for test CTT tokens.
+    const paymaster = new CandidePaymaster(paymasterUrl)
 
-    const tokensSupported = await paymaster.fetchSupportedERC20TokensAndPaymasterMetadata(smartAccount.entrypointAddress);
-    const tokenSelected = tokensSupported.tokens.find(token => token.address.toLocaleLowerCase() === paymasterTokenAddress.toLowerCase());
+    const tokensSupported = await paymaster.fetchSupportedERC20TokensAndPaymasterMetadata(smartAccount.entrypointAddress)
+    const tokenSelected = tokensSupported.tokens.find(
+        token => token.address.toLowerCase() === tokenAddress.toLowerCase()
+    )
 
-    console.log("This example uses Candide Token Paymaster");
-    console.log("Please visit https://dashboard.candide.dev/ to get a Paymaster URL");
-    console.log("Visit our Discord to get some CTT token for testing");
-
-    if (tokenSelected) {
-        userOperation = await paymaster.createTokenPaymasterUserOperation(
-            smartAccount,
-            userOperation,
-            tokenSelected.address,
-            bundlerUrl,
-        )
-        const cost = await paymaster.calculateUserOperationErc20TokenMaxGasCost(
-            userOperation,
-            tokenSelected.address,
-        )
-        console.log("This useroperation may cost upto : " + cost + " wei in " + tokenSelected.symbol + " token")
-        console.log(
-            "Please fund the sender account : " +
-            userOperation.sender +
-            " with more than " + cost + " wei CTT token"
-        )
+    if (!tokenSelected) {
+        console.log("Token " + tokenAddress + " is not supported by this paymaster.")
+        return
     }
-    
-    console.log("This example uses a Candide token paymaster.")
-    console.log("Please visit https://dashboard.candide.dev/ to get a token paymaster url.")
-    console.log("Please visit our Discord to get some CTT token for testing")
 
+    userOperation = await paymaster.createTokenPaymasterUserOperation(
+        smartAccount,
+        userOperation,
+        tokenSelected.address,
+        bundlerUrl,
+    )
+
+    const cost = await paymaster.calculateUserOperationErc20TokenMaxGasCost(
+        userOperation,
+        tokenSelected.address,
+    )
+    console.log("Estimated gas cost: " + cost + " wei in " + tokenSelected.symbol)
+    console.log("Sender account: " + userOperation.sender)
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 5: Sign UserOperation
+    // ──────────────────────────────────────────────────────────────────────
     userOperation.signature = smartAccount.signUserOperation(
         userOperation,
         eoaDelegatorPrivateKey,
         chainId,
-    );
-  
-    
-    let sendUserOperationResponse = await smartAccount.sendUserOperation(
+    )
+
+    // ──────────────────────────────────────────────────────────────────────
+    // Step 6: Send and wait for inclusion
+    // ──────────────────────────────────────────────────────────────────────
+    console.log("UserOperation:", userOperation)
+
+    const sendUserOperationResponse = await smartAccount.sendUserOperation(
         userOperation, bundlerUrl
-    );
+    )
 
-    console.log("userOperation: ", userOperation)
-    console.log("userOp sent! Waiting for inclusion...");
-    console.log("userOp Hash: ", sendUserOperationResponse.userOperationHash);
+    console.log("UserOp sent! Waiting for inclusion...")
+    console.log("UserOp hash:", sendUserOperationResponse.userOperationHash)
 
-    let userOperationReceiptResult = await sendUserOperationResponse.included();
+    const receipt = await sendUserOperationResponse.included()
 
-    console.log("Useroperation receipt received.")
-    console.log(userOperationReceiptResult)
-    if (userOperationReceiptResult.success) {
-        console.log("EOA upgraded to a Smart Account and minted two Nfts! The transaction hash is : " + userOperationReceiptResult.receipt.transactionHash)
+    console.log("UserOperation receipt received.")
+    console.log(receipt)
+    if (receipt.success) {
+        console.log("EOA upgraded to a Smart Account and minted two NFTs! Transaction hash: " + receipt.receipt.transactionHash)
     } else {
-        console.log("Useroperation execution failed")
+        console.log("UserOperation execution failed")
     }
 }
 
