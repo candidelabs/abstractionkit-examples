@@ -1,24 +1,37 @@
 # EIP-7702 Examples
 
-These examples demonstrate how to upgrade an EOA to a Smart Account with EIP-7702 and ERC-4337 User Operations. The scripts demo EOA upgrades and batch mints 2 NFTs, all in a single user operation.
+These examples demonstrate how to upgrade an EOA to a Smart Account with EIP-7702 and ERC-4337 User Operations.
 
-## Smart Accounts
+## Folder Structure
+
+```
+eip-7702/
+├── simple-account/       # Simple7702Account examples
+│   ├── upgrade-eoa.ts            # Upgrade EOA + batch mint NFTs (sponsored gas)
+│   ├── revoke-delegation.ts      # Revoke EIP-7702 delegation
+│   ├── upgrade-eoa-erc20-gas.ts  # Upgrade EOA with ERC-20 token gas payment
+│   └── upgrade-eoa-ep-v09.ts     # Upgrade EOA using EntryPoint v0.9
+└── calibur-account/      # Calibur7702Account examples (passkeys, key management)
+    ├── 01-upgrade-eoa.ts
+    ├── 02-passkeys.ts
+    └── 03-manage-keys.ts
+```
+
+## Simple7702Account
 
 [Simple7702Account](https://docs.candide.dev/wallet/abstractionkit/simple-7702-account/) is a fully audited minimalist smart contract account that can be safely authorized by any EOA. It adds full support for major smart account features like batching and gas sponsorship.
 
-
-### Initilization
+### Initialization
 
 ```ts
 import { Simple7702Account } from "abstractionkit";
 
-// EOA public address
-const eoaDelegatorPublicAddress = "0xBdbc5FBC9cA8C3F514D073eC3de840Ac84FC6D31"; 
+const eoaDelegatorPublicAddress = "0xBdbc5FBC9cA8C3F514D073eC3de840Ac84FC6D31";
 
 const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);
 ```
 
-### UserOperation creation
+### UserOperation Creation
 
 ```ts
 let userOperation = await smartAccount.createUserOperation(
@@ -31,7 +44,7 @@ let userOperation = await smartAccount.createUserOperation(
 );
 ```
 
-### Signing the Delegation Authorisation
+### Signing the Delegation Authorization
 
 ```ts
 userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
@@ -41,6 +54,19 @@ userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
     eoaDelegatorPrivateKey
 )
 ```
+
+### Revoking Delegation
+
+To revoke the EIP-7702 delegation (return the EOA to a regular account):
+
+```ts
+const signedTransaction = await smartAccount.createRevokeDelegationTransaction(
+    eoaDelegatorPrivateKey,
+    nodeUrl,
+);
+```
+
+This creates a signed transaction that delegates to address zero, effectively removing the smart account code from the EOA. See `simple-account/revoke-delegation.ts` for the full example.
 
 ## Gas Sponsorship with Paymaster
 
