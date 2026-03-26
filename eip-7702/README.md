@@ -66,8 +66,9 @@ userOperation.eip7702Auth = await createAndSignEip7702DelegationAuthorization(
     userOperation.eip7702Auth.address,
     BigInt(userOperation.eip7702Auth.nonce),
     async (hash: string) => {
-        // Any signer — hardware wallet, WalletConnect, browser extension, etc.
-        return await walletClient.signMessage({ message: { raw: hash as `0x${string}` } });
+        // Raw hash signing — any signer (hardware wallet, WalletConnect, etc.)
+        // Important: use account.sign(), NOT signMessage() (which adds EIP-191 prefix)
+        return await account.sign({ hash: hash as `0x${string}` });
     }
 )
 ```

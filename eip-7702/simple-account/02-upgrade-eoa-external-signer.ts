@@ -7,28 +7,26 @@ import {
     createUserOperationHash,
     CandidePaymaster,
 } from "abstractionkit";
-import { createWalletClient, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { arbitrumSepolia } from "viem/chains";
 
 // This example demonstrates upgrading an EOA to a 7702 smart account using
 // an external signer via abstractionkit's callback pattern. The delegation
-// authorization and UserOperation are signed through a viem WalletClient,
-// which can be backed by any signer (hardware wallet, WalletConnect, browser
+// authorization and UserOperation are signed through a viem Account, which
+// can be backed by any signer (hardware wallet, WalletConnect, browser
 // extension, etc.). Here we use privateKeyToAccount for demonstration, but
-// the WalletClient can be swapped for any viem account adapter.
+// it can be swapped for any viem account adapter (e.g. toAccount() for
+// custom signers).
+//
+// Key difference from 01-upgrade-eoa.ts: signing uses account.sign() (raw
+// hash signing) instead of passing private keys directly to abstractionkit.
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
     const { publicAddress: eoaDelegatorPublicAddress, privateKey: eoaDelegatorPrivateKey } = getOrCreateOwner()
 
-    // Create a viem WalletClient — replace privateKeyToAccount with your
-    // preferred account adapter (e.g. JSON-RPC, hardware wallet)
-    const walletClient = createWalletClient({
-        account: privateKeyToAccount(eoaDelegatorPrivateKey as `0x${string}`),
-        chain: arbitrumSepolia,
-        transport: http(nodeUrl),
-    });
+    // Create a viem Account — replace privateKeyToAccount with your
+    // preferred account adapter (e.g. toAccount() for custom signers)
+    const account = privateKeyToAccount(eoaDelegatorPrivateKey as `0x${string}`);
 
     // Initialize the smart account
     const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);
@@ -69,16 +67,17 @@ async function main(): Promise<void> {
     );
 
     // Sign delegation using abstractionkit's signer callback.
-    // The callback receives the authorization hash and returns the signature.
+    // The callback receives the raw authorization hash and returns the signature.
     // This decouples signing from key management — any signer can be plugged in.
+    // Important: use account.sign() for raw hash signing, NOT signMessage()
+    // which adds an EIP-191 prefix and produces a different recovered address.
     userOperation.eip7702Auth = await createAndSignEip7702DelegationAuthorization(
         BigInt(userOperation.eip7702Auth.chainId),
         userOperation.eip7702Auth.address,
         BigInt(userOperation.eip7702Auth.nonce),
         async (hash: string) => {
-            return await walletClient.signMessage({
-                message: { raw: hash as `0x${string}` },
-            });
+            const sig = await account.sign({ hash: hash as `0x${string}` });
+            return sig;
         }
     )
 
@@ -89,16 +88,14 @@ async function main(): Promise<void> {
     userOperation = paymasterUserOperation;
 
     // Sign UserOperation using the same external signer pattern.
-    // createUserOperationHash produces the hash, then sign it externally.
+    // createUserOperationHash produces the hash, then sign it with account.sign().
     const userOperationHash = createUserOperationHash(
         userOperation,
         smartAccount.entrypointAddress,
         chainId,
     );
 
-    userOperation.signature = await walletClient.signMessage({
-        message: { raw: userOperationHash as `0x${string}` },
-    });
+    userOperation.signature = await account.sign({ hash: userOperationHash as `0x${string}` });
 
     console.log("UserOperation:", userOperation)
 
