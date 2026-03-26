@@ -54,7 +54,11 @@ npx ts-node <folder>/<script>.ts
 | Pay gas with ERC-20 | `pay-gas-in-erc20/` | `pay-gas-in-erc20.ts` |
 | Batch multiple txs | `batch-transactions/` | `batch-transactions.ts` |
 | Account recovery | `recovery/` | `recovery.ts` |
-| EIP-7702 delegation | `eip-7702/` | `upgrade-eoa-to-7702-smart-account.ts` |
+| EIP-7702 delegation | `eip-7702/simple-account/` | `01-upgrade-eoa.ts` |
+| EIP-7702 external signer | `eip-7702/simple-account/` | `02-upgrade-eoa-external-signer.ts` |
+| EIP-7702 pay gas in ERC-20 | `eip-7702/simple-account/` | `03-upgrade-eoa-erc20-gas.ts` |
+| EIP-7702 EP v0.9 | `eip-7702/simple-account/` | `04-upgrade-eoa-ep-v09.ts` |
+| EIP-7702 revoke delegation | `eip-7702/simple-account/` | `05-revoke-delegation.ts` |
 | Debug with Tenderly | `simulate-with-tenderly/` | `simulate-with-tenderly.ts` |
 | Multichain-chain add owner | `chain-abstraction/` | `add-owner.ts` |
 | Multichain add guardian | `chain-abstraction/` | `add-guardian.ts` |
