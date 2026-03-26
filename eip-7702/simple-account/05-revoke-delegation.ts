@@ -1,4 +1,4 @@
-import { loadEnv, getOrCreateOwner } from '../../utils/env'
+import { requireEnv, getOrCreateOwner } from '../../utils/env'
 import { Simple7702Account } from "abstractionkit"
 import { createPublicClient, http, formatEther } from "viem"
 
@@ -7,7 +7,7 @@ import { createPublicClient, http, formatEther } from "viem"
 // EOA needs native tokens to pay for gas.
 
 async function main(): Promise<void> {
-    const { nodeUrl } = loadEnv()
+    const nodeUrl = requireEnv('NODE_URL')
     const { publicAddress: eoaDelegatorPublicAddress, privateKey: eoaDelegatorPrivateKey } = getOrCreateOwner()
 
     const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress)
@@ -28,6 +28,7 @@ async function main(): Promise<void> {
     // ──────────────────────────────────────────────────────────────────────
     const balance = await client.getBalance({ address: eoaDelegatorPublicAddress as `0x${string}` })
 
+    // Note: a small non-zero balance may still be insufficient for gas.
     if (balance === 0n) {
         console.log("EOA " + eoaDelegatorPublicAddress + " has no native token balance to pay for gas.")
         console.log("Fund the EOA before revoking delegation.")

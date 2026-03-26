@@ -4,14 +4,14 @@ These examples demonstrate how to upgrade an EOA to a Smart Account with EIP-770
 
 ## Folder Structure
 
-```
+```text
 eip-7702/
 ├── simple-account/       # Simple7702Account examples
 │   ├── 01-upgrade-eoa.ts                 # Upgrade EOA + batch mint NFTs (sponsored gas)
-│   ├── 02-upgrade-eoa-erc20-gas.ts       # Upgrade EOA with ERC-20 token gas payment
-│   ├── 03-upgrade-eoa-ep-v09.ts          # Upgrade EOA using EntryPoint v0.9
-│   ├── 04-revoke-delegation.ts           # Revoke EIP-7702 delegation
-│   └── 05-upgrade-eoa-external-signer.ts # Upgrade EOA with external signer (viem WalletClient)
+│   ├── 02-upgrade-eoa-external-signer.ts # Upgrade EOA with external signer (viem Account)
+│   ├── 03-upgrade-eoa-erc20-gas.ts       # Upgrade EOA with ERC-20 token gas payment
+│   ├── 04-upgrade-eoa-ep-v09.ts          # Upgrade EOA using EntryPoint v0.9
+│   └── 05-revoke-delegation.ts           # Revoke EIP-7702 delegation
 └── calibur-account/      # Calibur7702Account examples (passkeys, key management)
     ├── 01-upgrade-eoa.ts
     ├── 02-passkeys.ts
