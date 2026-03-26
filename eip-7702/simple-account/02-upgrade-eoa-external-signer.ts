@@ -60,17 +60,20 @@ async function main(): Promise<void> {
     // ──────────────────────────────────────────────────────────────────────
     // Step 4: Sign delegation with signer callback
     // ──────────────────────────────────────────────────────────────────────
+    // If the EOA is already delegated, eip7702Auth is null — skip signing.
     // The callback receives the raw authorization hash and returns a signature.
     // Use account.sign() for raw signing — NOT signMessage(), which adds an
     // EIP-191 prefix and produces a different recovered address.
-    userOperation.eip7702Auth = await createAndSignEip7702DelegationAuthorization(
-        BigInt(userOperation.eip7702Auth.chainId),
-        userOperation.eip7702Auth.address,
-        BigInt(userOperation.eip7702Auth.nonce),
-        async (hash: string) => {
-            return await account.sign({ hash: hash as `0x${string}` })
-        }
-    )
+    if (userOperation.eip7702Auth) {
+        userOperation.eip7702Auth = await createAndSignEip7702DelegationAuthorization(
+            BigInt(userOperation.eip7702Auth.chainId),
+            userOperation.eip7702Auth.address,
+            BigInt(userOperation.eip7702Auth.nonce),
+            async (hash: string) => {
+                return await account.sign({ hash: hash as `0x${string}` })
+            }
+        )
+    }
 
     // ──────────────────────────────────────────────────────────────────────
     // Step 5: Sponsor gas with paymaster

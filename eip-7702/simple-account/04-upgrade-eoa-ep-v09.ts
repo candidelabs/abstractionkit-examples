@@ -53,12 +53,15 @@ async function main(): Promise<void> {
     // ──────────────────────────────────────────────────────────────────────
     // Step 4: Sign EIP-7702 delegation authorization
     // ──────────────────────────────────────────────────────────────────────
-    userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
-        BigInt(userOperation.eip7702Auth.chainId),
-        userOperation.eip7702Auth.address,
-        BigInt(userOperation.eip7702Auth.nonce),
-        eoaDelegatorPrivateKey,
-    )
+    // If the EOA is already delegated, eip7702Auth is null — skip signing.
+    if (userOperation.eip7702Auth) {
+        userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
+            BigInt(userOperation.eip7702Auth.chainId),
+            userOperation.eip7702Auth.address,
+            BigInt(userOperation.eip7702Auth.nonce),
+            eoaDelegatorPrivateKey,
+        )
+    }
 
     // ──────────────────────────────────────────────────────────────────────
     // Step 5: Sign UserOperation and fetch paymaster data in parallel
