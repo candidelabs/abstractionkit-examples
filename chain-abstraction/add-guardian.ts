@@ -37,6 +37,7 @@ async function main(): Promise<void> {
     console.log("\nOwner:", ownerPublicAddress)
     console.log("Guardian to add:", guardianAddress)
 
+    // Initialize SafeMultiChainSigAccountV1 for deterministic address across chains
     const smartAccount = SafeAccount.initializeNewAccount(
         [ownerPublicAddress],
     )
@@ -61,6 +62,7 @@ async function main(): Promise<void> {
 
     const transactions = [enableModuleTx, addGuardianTx]
 
+    // Set up CandidePaymaster for gas sponsorship on both chains
     const paymaster1 = new CandidePaymaster(paymasterUrl1)
     const paymaster2 = new CandidePaymaster(paymasterUrl2)
 

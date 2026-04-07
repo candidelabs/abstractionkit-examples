@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     const paymaster = new CandidePaymaster(paymasterUrl);
 
     const [paymasterSubAccount1UserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
-        subAccount1DeployMainAccountUserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+        subAccount1, subAccount1DeployMainAccountUserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     subAccount1DeployMainAccountUserOperation = paymasterSubAccount1UserOperation;
 
     subAccount1DeployMainAccountUserOperation.signature = subAccount1.signUserOperation(
@@ -138,7 +138,7 @@ async function main(): Promise<void> {
     )
 
     let [paymasterUserOperation1, _sponsorMetadata1] = await paymaster.createSponsorPaymasterUserOperation(
-        mainAccountUserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+        mainAccount, mainAccountUserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     mainAccountUserOperation = paymasterUserOperation1;
 
     mainAccountUserOperation.signature = SafeAccount.formatSignaturesToUseroperationSignature(
@@ -169,7 +169,7 @@ async function main(): Promise<void> {
         bundlerUrl,
     )
     const [paymasterSubAccount1UserOperation11, _sponsorMetadata11] = await paymaster.createSponsorPaymasterUserOperation(
-        subAccount1UserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+        subAccount1, subAccount1UserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     subAccount1UserOperation = paymasterSubAccount1UserOperation11;
 
     subAccount1UserOperation.signature = subAccount1.signUserOperation(
@@ -183,7 +183,7 @@ async function main(): Promise<void> {
         bundlerUrl,
     )
     const [paymasterSubAccount2UserOperation, _sponsorMetadata2] = await paymaster.createSponsorPaymasterUserOperation(
-        subAccount2UserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+        subAccount2, subAccount2UserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     subAccount2UserOperation = paymasterSubAccount2UserOperation;
 
     subAccount2UserOperation.signature = subAccount2.signUserOperation(
@@ -241,9 +241,11 @@ async function main(): Promise<void> {
 
     console.log("Useroperation receipt received.")
     console.log(userOperationReceiptResult)
-    if (userOperationReceiptResult.success) {
+    if (userOperationReceiptResult == null) {
+        console.log("Receipt not found (timeout)")
+    } else if (userOperationReceiptResult.success) {
         console.log(
-            "Two Nfts were minted. The transaction hash is : " +
+            "An NFT was minted. The transaction hash is : " +
             userOperationReceiptResult.receipt.transactionHash
         )
     } else {

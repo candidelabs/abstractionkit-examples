@@ -102,7 +102,9 @@ async function main(nonce:bigint): Promise<void> {
 
     console.log("Useroperation receipt received.")
     console.log(userOperationReceiptResult)
-    if (userOperationReceiptResult.success) {
+    if (userOperationReceiptResult == null) {
+        console.log("Receipt not found (timeout)")
+    } else if (userOperationReceiptResult.success) {
         console.log("Two Nfts were minted. The transaction hash is : " + userOperationReceiptResult.receipt.transactionHash)
     } else {
         console.log("Useroperation execution failed")

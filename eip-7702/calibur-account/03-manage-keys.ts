@@ -45,7 +45,7 @@ async function main(): Promise<void> {
     const paymaster = new CandidePaymaster(paymasterUrl)
 
     // This example requires an already-delegated account.
-    const delegated = await smartAccount.isDelegated(nodeUrl)
+    const delegated = await smartAccount.isDelegatedToThisAccount(nodeUrl)
     if (!delegated) {
         console.log("This EOA is not yet delegated to Calibur.")
         console.log("Run 01-upgrade-eoa.ts or 02-passkeys.ts first, then re-run this example.")
@@ -57,8 +57,8 @@ async function main(): Promise<void> {
     // ════════════════════════════════════════════════════════════════════════
     console.log("Listing registered keys...\n")
 
-    const keys = await smartAccount.listKeys(nodeUrl)
-    const keyTypeNames = { [CaliburKeyType.P256]: 'P256', [CaliburKeyType.WebAuthnP256]: 'WebAuthn', [CaliburKeyType.Secp256k1]: 'Secp256k1' }
+    const keys = await smartAccount.getKeys(nodeUrl)
+    const keyTypeNames: Record<number, string> = { [CaliburKeyType.P256]: 'P256', [CaliburKeyType.WebAuthnP256]: 'WebAuthn', [CaliburKeyType.Secp256k1]: 'Secp256k1' }
 
     for (const key of keys) {
         const keyHash = Calibur7702Account.getKeyHash(key)
@@ -98,7 +98,7 @@ async function main(): Promise<void> {
         registerTxs, nodeUrl, bundlerUrl,
     )
     let [sponsoredRegisterOp] = await paymaster.createSponsorPaymasterUserOperation(
-        registerOp, bundlerUrl, sponsorshipPolicyId,
+        smartAccount, registerOp, bundlerUrl, sponsorshipPolicyId,
     )
     registerOp = sponsoredRegisterOp
     registerOp.signature = smartAccount.signUserOperation(
@@ -109,7 +109,10 @@ async function main(): Promise<void> {
     const registerResponse = await smartAccount.sendUserOperation(registerOp, bundlerUrl)
     const registerReceipt = await registerResponse.included()
 
-    if (registerReceipt.success) {
+    if (registerReceipt == null) {
+        console.log("Receipt not found (timeout)")
+        return
+    } else if (registerReceipt.success) {
         console.log("Key registered! Tx:", registerReceipt.receipt.transactionHash)
     } else {
         console.log("Registration failed:", registerReceipt)
@@ -140,7 +143,7 @@ async function main(): Promise<void> {
         nodeUrl, bundlerUrl,
     )
     let [sponsoredSecondaryOp] = await paymaster.createSponsorPaymasterUserOperation(
-        secondaryOp, bundlerUrl, sponsorshipPolicyId,
+        smartAccount, secondaryOp, bundlerUrl, sponsorshipPolicyId,
     )
     secondaryOp = sponsoredSecondaryOp
     secondaryOp.signature = smartAccount.signUserOperation(
@@ -150,7 +153,10 @@ async function main(): Promise<void> {
     const secondaryResponse = await smartAccount.sendUserOperation(secondaryOp, bundlerUrl)
     const secondaryReceipt = await secondaryResponse.included()
 
-    if (secondaryReceipt.success) {
+    if (secondaryReceipt == null) {
+        console.log("Receipt not found (timeout)")
+        return
+    } else if (secondaryReceipt.success) {
         console.log("Transaction signed by secondary key! Tx:", secondaryReceipt.receipt.transactionHash)
     } else {
         console.log("Transaction failed:", secondaryReceipt)
@@ -176,7 +182,7 @@ async function main(): Promise<void> {
         [updateTx], nodeUrl, bundlerUrl,
     )
     let [sponsoredUpdateOp] = await paymaster.createSponsorPaymasterUserOperation(
-        updateOp, bundlerUrl, sponsorshipPolicyId,
+        smartAccount, updateOp, bundlerUrl, sponsorshipPolicyId,
     )
     updateOp = sponsoredUpdateOp
     updateOp.signature = smartAccount.signUserOperation(
@@ -186,7 +192,10 @@ async function main(): Promise<void> {
     const updateResponse = await smartAccount.sendUserOperation(updateOp, bundlerUrl)
     const updateReceipt = await updateResponse.included()
 
-    if (updateReceipt.success) {
+    if (updateReceipt == null) {
+        console.log("Receipt not found (timeout)")
+        return
+    } else if (updateReceipt.success) {
         const updatedSettings = await smartAccount.getKeySettings(nodeUrl, newKeyHash)
         console.log("Expiration updated to:", new Date(updatedSettings.expiration * 1000).toISOString())
         console.log("Tx:", updateReceipt.receipt.transactionHash)
@@ -207,7 +216,7 @@ async function main(): Promise<void> {
         [revokeTx], nodeUrl, bundlerUrl,
     )
     let [sponsoredRevokeOp] = await paymaster.createSponsorPaymasterUserOperation(
-        revokeOp, bundlerUrl, sponsorshipPolicyId,
+        smartAccount, revokeOp, bundlerUrl, sponsorshipPolicyId,
     )
     revokeOp = sponsoredRevokeOp
     revokeOp.signature = smartAccount.signUserOperation(
@@ -217,7 +226,10 @@ async function main(): Promise<void> {
     const revokeResponse = await smartAccount.sendUserOperation(revokeOp, bundlerUrl)
     const revokeReceipt = await revokeResponse.included()
 
-    if (revokeReceipt.success) {
+    if (revokeReceipt == null) {
+        console.log("Receipt not found (timeout)")
+        return
+    } else if (revokeReceipt.success) {
         const stillRegistered = await smartAccount.isKeyRegistered(nodeUrl, newKeyHash)
         console.log("Key still registered:", stillRegistered) // false
         console.log("Tx:", revokeReceipt.receipt.transactionHash)
@@ -229,7 +241,7 @@ async function main(): Promise<void> {
     // Final: List keys again
     // ════════════════════════════════════════════════════════════════════════
     console.log("\nFinal key list:")
-    const finalKeys = await smartAccount.listKeys(nodeUrl)
+    const finalKeys = await smartAccount.getKeys(nodeUrl)
     for (const key of finalKeys) {
         const kh = Calibur7702Account.getKeyHash(key)
         console.log(`  ${kh.slice(0, 18)}... (${keyTypeNames[key.keyType] ?? key.keyType})`)

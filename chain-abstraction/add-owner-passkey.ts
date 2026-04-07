@@ -78,6 +78,7 @@ async function main(): Promise<void> {
     console.log("\nPasskey owner (signer):", credential.id.slice(0, 20) + "...")
     console.log("New owner to add:", newOwnerAddress)
 
+    // Initialize Safe Unified Account with passkey as owner
     const smartAccount = SafeAccount.initializeNewAccount([webauthPublicKey])
 
     console.log("\nSafe Account (same on both chains):", smartAccount.accountAddress)
@@ -85,10 +86,12 @@ async function main(): Promise<void> {
     console.log("  - Chain 1:", chainId1.toString())
     console.log("  - Chain 2:", chainId2.toString())
 
+    // Create add owner transaction
     const addOwnerTx = smartAccount.createStandardAddOwnerWithThresholdMetaTransaction(
         newOwnerAddress, 1
     );
 
+    // Set up CandidePaymaster for gas sponsorship on both chains
     const paymaster1 = new CandidePaymaster(paymasterUrl1)
     const paymaster2 = new CandidePaymaster(paymasterUrl2)
 

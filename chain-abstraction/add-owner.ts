@@ -35,6 +35,7 @@ async function main(): Promise<void> {
     console.log("\nOriginal owner:", ownerPublicAddress)
     console.log("New owner to add:", newOwnerAddress)
 
+    // Initialize SafeMultiChainSigAccountV1 for deterministic address across chains
     const smartAccount = SafeAccount.initializeNewAccount(
         [ownerPublicAddress],
     )
@@ -44,11 +45,13 @@ async function main(): Promise<void> {
     console.log("  - Chain 1:", chainId1.toString())
     console.log("  - Chain 2:", chainId2.toString())
 
+    // Create add owner transaction (threshold = 1, any single owner can sign)
     const addOwnerTx = smartAccount.createStandardAddOwnerWithThresholdMetaTransaction(
         newOwnerAddress,
-        1
+        1 // threshold
     );
 
+    // Set up CandidePaymaster for gas sponsorship on both chains
     const paymaster1 = new CandidePaymaster(paymasterUrl1)
     const paymaster2 = new CandidePaymaster(paymasterUrl2)
 

@@ -74,7 +74,7 @@ async function main(): Promise<void> {
     const paymaster = new CandidePaymaster(paymasterUrl);
 
     let [sponsoredSetAllowanceUserOp, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
-        setAllowanceUserOp, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+        sourceSafeAccount, setAllowanceUserOp, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     setAllowanceUserOp = sponsoredSetAllowanceUserOp;
 
     setAllowanceUserOp.signature = sourceSafeAccount.signUserOperation(
@@ -93,7 +93,9 @@ async function main(): Promise<void> {
 
     console.log("Useroperation receipt received.")
     console.log(setAllowanceUserOpReceiptResult)
-    if (setAllowanceUserOpReceiptResult.success) {
+    if (setAllowanceUserOpReceiptResult == null) {
+        console.log("Receipt not found (timeout)")
+    } else if (setAllowanceUserOpReceiptResult.success) {
         console.log("Spending Permissions is given to the Delegate. The transaction hash is : " + setAllowanceUserOpReceiptResult.receipt.transactionHash)
     } else {
         console.log("Useroperation execution failed")
@@ -114,7 +116,7 @@ async function main(): Promise<void> {
     let allowanceTransferUserOp = await delegateSafeAccount.createUserOperation([allowanceTransferMetaTransaction], nodeUrl, bundlerUrl);
 
     let [sponsoredAllowanceTransferUserOp, _sponsorMetaData2] = await paymaster.createSponsorPaymasterUserOperation(
-        allowanceTransferUserOp, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+        delegateSafeAccount, allowanceTransferUserOp, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     allowanceTransferUserOp = sponsoredAllowanceTransferUserOp;
 
     allowanceTransferUserOp.signature = sourceSafeAccount.signUserOperation(
@@ -124,7 +126,7 @@ async function main(): Promise<void> {
     )
     console.log(allowanceTransferUserOp)
 
-    const sendAllowanceTransferUserOpResponse = await sourceSafeAccount.sendUserOperation(
+    const sendAllowanceTransferUserOpResponse = await delegateSafeAccount.sendUserOperation(
         allowanceTransferUserOp, bundlerUrl
     );
 
@@ -133,7 +135,9 @@ async function main(): Promise<void> {
 
     console.log("Useroperation receipt received.")
     console.log(allowanceTransferUserOpReceiptResult)
-    if (allowanceTransferUserOpReceiptResult.success) {
+    if (allowanceTransferUserOpReceiptResult == null) {
+        console.log("Receipt not found (timeout)")
+    } else if (allowanceTransferUserOpReceiptResult.success) {
         console.log("Delegate transfered tokens from the source Safe Account. The transaction hash is : " + allowanceTransferUserOpReceiptResult.receipt.transactionHash)
     } else {
         console.log("Useroperation execution failed")
