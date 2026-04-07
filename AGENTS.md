@@ -167,7 +167,7 @@ const receipt = await response.included();
 | `SafeAccountV0_3_0` | Most examples (recommended) | v0.7 |
 | `SafeAccountV0_2_0` | Legacy/v0.6 compatibility | v0.6 |
 | `Simple7702Account` | EIP-7702 delegation | v0.8 |
-| `ExperimentalSafeMultiChainSigAccount` | Chain abstraction (Safe Unified Account) | v0.9 |
+| `SafeMultiChainSigAccountV1` | Chain abstraction (Safe Unified Account) | v0.9 |
 | `Calibur7702Account` | EIP-7702 Calibur (passkeys, key mgmt) | v0.8 (default) |
 
 ## Common Commands

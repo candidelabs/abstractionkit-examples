@@ -17,15 +17,15 @@
 import { loadMultiChainEnv, getOrCreateOwner } from '../utils/env'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import {
-    ExperimentalSafeMultiChainSigAccount as SafeAccount,
-    ExperimentalAllowAllParallelPaymaster,
+    SafeMultiChainSigAccountV1 as SafeAccount,
+    CandidePaymaster,
     SocialRecoveryModule,
     SocialRecoveryModuleGracePeriodSelector,
     UserOperationV9,
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2 } = loadMultiChainEnv()
+    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2, paymasterUrl1, paymasterUrl2 } = loadMultiChainEnv()
     const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
 
     // Generate guardian address (or use from env)
@@ -37,7 +37,6 @@ async function main(): Promise<void> {
     console.log("\nOwner:", ownerPublicAddress)
     console.log("Guardian to add:", guardianAddress)
 
-    // Initialize ExperimentalSafeMultiChainSigAccount with c2Nonce for deterministic address
     const smartAccount = SafeAccount.initializeNewAccount(
         [ownerPublicAddress],
     )
@@ -47,83 +46,78 @@ async function main(): Promise<void> {
     console.log("  - Chain 1:", chainId1.toString())
     console.log("  - Chain 2:", chainId2.toString())
 
-    // Create SocialRecoveryModule instance
     const gracePeriod3Minutes = SocialRecoveryModuleGracePeriodSelector.After3Minutes;
     const srm = new SocialRecoveryModule(gracePeriod3Minutes)
 
-    // Create transactions to enable module and add guardian
-    // These are the same for both chains
-    console.log("\n[1/4] Creating guardian setup transactions...")
+    console.log("\n[1/6] Creating guardian setup transactions...")
 
     const enableModuleTx = srm.createEnableModuleMetaTransaction(
         smartAccount.accountAddress
     )
     const addGuardianTx = srm.createAddGuardianWithThresholdMetaTransaction(
         guardianAddress,
-        1n // Recovery threshold: 1 guardian needed to recover
+        1n
     )
 
-    // Transactions to execute on each chain
     const transactions = [enableModuleTx, addGuardianTx]
 
-    // Set up ExperimentalAllowAllParallelPaymaster for gas sponsorship
-    const paymaster = new ExperimentalAllowAllParallelPaymaster();
+    const paymaster1 = new CandidePaymaster(paymasterUrl1)
+    const paymaster2 = new CandidePaymaster(paymasterUrl2)
 
-    // Fetch paymaster init values concurrently
-    const [paymasterInitFields1, paymasterInitFields2] = await Promise.all([
-        paymaster.getPaymasterFieldsInitValues(chainId1),
-        paymaster.getPaymasterFieldsInitValues(chainId2),
-    ]);
+    console.log("[2/6] Creating UserOperations for both chains...")
 
-    // Create UserOperations for both chains concurrently
-    console.log("[2/4] Creating UserOperations for both chains...")
-
-    const [userOperation1, userOperation2] = await Promise.all([
+    let [userOperation1, userOperation2] = await Promise.all([
         smartAccount.createUserOperation(
-            transactions,
-            nodeUrl1,
-            bundlerUrl1,
-            {
-                parallelPaymasterInitValues: paymasterInitFields1,
-                preVerificationGasPercentageMultiplier: 120,
-            }
+            transactions, nodeUrl1, bundlerUrl1,
         ),
         smartAccount.createUserOperation(
-            transactions,
-            nodeUrl2,
-            bundlerUrl2,
-            {
-                parallelPaymasterInitValues: paymasterInitFields2,
-                preVerificationGasPercentageMultiplier: 120,
-            }
+            transactions, nodeUrl2, bundlerUrl2,
         ),
     ]);
 
-    // KEY VALUE PROPOSITION: Single signature for ALL chains!
-    console.log("[3/4] Signing operations for BOTH chains with ONE signature...")
+    console.log("[3/6] Paymaster commit on both chains...")
 
-    const [signatures, paymasterData1, paymasterData2] = await Promise.all([
-        smartAccount.signUserOperations(
-            [
-                { userOperation: userOperation1, chainId: chainId1 },
-                { userOperation: userOperation2, chainId: chainId2 }
-            ],
-            [ownerPrivateKey],
+    const commitOverrides = { preVerificationGasPercentageMultiplier: 120, context: { signingPhase: "commit" as const } };
+    const [[commitOp1], [commitOp2]] = await Promise.all([
+        paymaster1.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation1, bundlerUrl1, undefined, commitOverrides,
         ),
-        paymaster.getApprovedPaymasterData(userOperation1),
-        paymaster.getApprovedPaymasterData(userOperation2)
-    ]);
+        paymaster2.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation2, bundlerUrl2, undefined, commitOverrides,
+        ),
+    ])
+    userOperation1 = commitOp1
+    userOperation2 = commitOp2
 
-    // Apply signatures and paymaster data
-    userOperation1.signature = signatures[0];
-    userOperation2.signature = signatures[1];
-    userOperation1.paymasterData = paymasterData1;
-    userOperation2.paymasterData = paymasterData2;
+    console.log("[4/6] Signing operations for BOTH chains with ONE signature...")
+
+    const signatures = smartAccount.signUserOperations(
+        [
+            { userOperation: userOperation1, chainId: chainId1 },
+            { userOperation: userOperation2, chainId: chainId2 }
+        ],
+        [ownerPrivateKey],
+    )
+    userOperation1.signature = signatures[0]
+    userOperation2.signature = signatures[1]
 
     console.log("  Single signing operation generated", signatures.length, "signatures!")
 
-    // Submit to bundlers concurrently
-    console.log("[4/4] Submitting to bundlers on both chains...")
+    console.log("[5/6] Paymaster finalize on both chains...")
+
+    const finalizeOverrides = { context: { signingPhase: "finalize" as const } };
+    const [[finalOp1], [finalOp2]] = await Promise.all([
+        paymaster1.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation1, bundlerUrl1, undefined, finalizeOverrides,
+        ),
+        paymaster2.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation2, bundlerUrl2, undefined, finalizeOverrides,
+        ),
+    ])
+    userOperation1 = finalOp1
+    userOperation2 = finalOp2
+
+    console.log("[6/6] Submitting to bundlers on both chains...")
 
     await Promise.all([
         sendAndMonitorUserOperation(userOperation1, bundlerUrl1, "Chain 1"),
@@ -157,14 +151,15 @@ async function sendAndMonitorUserOperation(
 ): Promise<void> {
     const smartAccount = new SafeAccount(userOperation.sender);
     const sendUserOperationResponse = await smartAccount.sendUserOperation(
-        userOperation,
-        bundlerUrl
+        userOperation, bundlerUrl
     )
 
     console.log(`  [${chainName}] UserOperation sent. Waiting for inclusion...`)
     const receipt = await sendUserOperationResponse.included()
 
-    if (receipt.success) {
+    if (receipt == null) {
+        console.log(`  [${chainName}] Receipt not found (timeout)`)
+    } else if (receipt.success) {
         console.log(`  [${chainName}] Success! Tx: ${receipt.receipt.transactionHash}`)
     } else {
         console.log(`  [${chainName}] Execution failed`)
