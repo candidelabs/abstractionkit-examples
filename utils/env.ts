@@ -16,6 +16,8 @@ const DEFAULTS: Record<string, string> = {
     BUNDLER_URL2: 'https://api.candide.dev/public/v3/11155420',
     NODE_URL1: 'https://ethereum-sepolia-rpc.publicnode.com',
     NODE_URL2: 'https://sepolia.optimism.io',
+    PAYMASTER_URL1: 'https://api.candide.dev/public/v3/11155111',
+    PAYMASTER_URL2: 'https://api.candide.dev/public/v3/11155420',
 }
 
 function get(key: string): string {
@@ -69,7 +71,7 @@ export function loadEnv() {
         bundlerUrl: requireEnv('BUNDLER_URL'),
         nodeUrl: requireEnv('NODE_URL'),
         paymasterUrl: requireEnv('PAYMASTER_URL'),
-        sponsorshipPolicyId: get('SPONSORSHIP_POLICY_ID'),
+        sponsorshipPolicyId: get('SPONSORSHIP_POLICY_ID') || undefined,
     }
 }
 
@@ -84,5 +86,7 @@ export function loadMultiChainEnv() {
         bundlerUrl2: requireEnv('BUNDLER_URL2'),
         nodeUrl1: requireEnv('NODE_URL1'),
         nodeUrl2: requireEnv('NODE_URL2'),
+        paymasterUrl1: requireEnv('PAYMASTER_URL1'),
+        paymasterUrl2: requireEnv('PAYMASTER_URL2')
     }
 }

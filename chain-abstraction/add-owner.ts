@@ -16,13 +16,13 @@
 import { loadMultiChainEnv, getOrCreateOwner } from '../utils/env'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import {
-    ExperimentalSafeMultiChainSigAccount as SafeAccount,
-    ExperimentalAllowAllParallelPaymaster,
+    SafeMultiChainSigAccountV1 as SafeAccount,
+    CandidePaymaster,
     UserOperationV9,
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2 } = loadMultiChainEnv()
+    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2, paymasterUrl1, paymasterUrl2 } = loadMultiChainEnv()
     const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
 
     // Generate a new owner address to add
@@ -35,7 +35,6 @@ async function main(): Promise<void> {
     console.log("\nOriginal owner:", ownerPublicAddress)
     console.log("New owner to add:", newOwnerAddress)
 
-    // Initialize ExperimentalSafeMultiChainSigAccount with c2Nonce for deterministic address
     const smartAccount = SafeAccount.initializeNewAccount(
         [ownerPublicAddress],
     )
@@ -45,65 +44,68 @@ async function main(): Promise<void> {
     console.log("  - Chain 1:", chainId1.toString())
     console.log("  - Chain 2:", chainId2.toString())
 
-    // Create add owner transaction (threshold = 1, any single owner can sign)
     const addOwnerTx = smartAccount.createStandardAddOwnerWithThresholdMetaTransaction(
         newOwnerAddress,
-        1 // threshold
+        1
     );
 
-    // Set up ExperimentalAllowAllParallelPaymaster for gas sponsorship
-    const paymaster = new ExperimentalAllowAllParallelPaymaster();
+    const paymaster1 = new CandidePaymaster(paymasterUrl1)
+    const paymaster2 = new CandidePaymaster(paymasterUrl2)
 
-    const [paymasterInitFields1, paymasterInitFields2] = await Promise.all([
-        paymaster.getPaymasterFieldsInitValues(chainId1),
-        paymaster.getPaymasterFieldsInitValues(chainId2),
-    ]);
+    console.log("\n[1/5] Creating UserOperations for both chains...")
 
-    console.log("\n[1/3] Creating UserOperations for both chains...")
-
-    const [userOperation1, userOperation2] = await Promise.all([
+    let [userOperation1, userOperation2] = await Promise.all([
         smartAccount.createUserOperation(
-            [addOwnerTx],
-            nodeUrl1,
-            bundlerUrl1,
-            {
-                parallelPaymasterInitValues: paymasterInitFields1,
-                preVerificationGasPercentageMultiplier: 120
-            }
+            [addOwnerTx], nodeUrl1, bundlerUrl1,
         ),
         smartAccount.createUserOperation(
-            [addOwnerTx],
-            nodeUrl2,
-            bundlerUrl2,
-            {
-                parallelPaymasterInitValues: paymasterInitFields2,
-                preVerificationGasPercentageMultiplier: 120
-            }
+            [addOwnerTx], nodeUrl2, bundlerUrl2,
         ),
     ]);
 
-    console.log("[2/3] Signing for BOTH chains with ONE signature...")
+    console.log("[2/5] Paymaster commit on both chains...")
 
-    const [signatures, paymasterData1, paymasterData2] = await Promise.all([
-        smartAccount.signUserOperations(
-            [
-                { userOperation: userOperation1, chainId: chainId1 },
-                { userOperation: userOperation2, chainId: chainId2 }
-            ],
-            [ownerPrivateKey],
+    const commitOverrides = { preVerificationGasPercentageMultiplier: 120, context: { signingPhase: "commit" as const } };
+    const [[commitOp1], [commitOp2]] = await Promise.all([
+        paymaster1.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation1, bundlerUrl1, undefined, commitOverrides,
         ),
-        paymaster.getApprovedPaymasterData(userOperation1),
-        paymaster.getApprovedPaymasterData(userOperation2)
-    ]);
+        paymaster2.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation2, bundlerUrl2, undefined, commitOverrides,
+        ),
+    ])
+    userOperation1 = commitOp1
+    userOperation2 = commitOp2
 
-    userOperation1.signature = signatures[0];
-    userOperation2.signature = signatures[1];
-    userOperation1.paymasterData = paymasterData1;
-    userOperation2.paymasterData = paymasterData2;
+    console.log("[3/5] Signing for BOTH chains with ONE signature...")
+
+    const signatures = smartAccount.signUserOperations(
+        [
+            { userOperation: userOperation1, chainId: chainId1 },
+            { userOperation: userOperation2, chainId: chainId2 }
+        ],
+        [ownerPrivateKey],
+    )
+    userOperation1.signature = signatures[0]
+    userOperation2.signature = signatures[1]
 
     console.log("  Single signing operation generated", signatures.length, "signatures!")
 
-    console.log("[3/3] Submitting to both chains...")
+    console.log("[4/5] Paymaster finalize on both chains...")
+
+    const finalizeOverrides = { context: { signingPhase: "finalize" as const } };
+    const [[finalOp1], [finalOp2]] = await Promise.all([
+        paymaster1.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation1, bundlerUrl1, undefined, finalizeOverrides,
+        ),
+        paymaster2.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation2, bundlerUrl2, undefined, finalizeOverrides,
+        ),
+    ])
+    userOperation1 = finalOp1
+    userOperation2 = finalOp2
+
+    console.log("[5/5] Submitting to both chains...")
 
     await Promise.all([
         sendAndMonitorUserOperation(userOperation1, bundlerUrl1, "Chain 1"),
@@ -124,8 +126,8 @@ async function main(): Promise<void> {
     console.log("\nOwners on Chain 1:", owners1)
     console.log("Owners on Chain 2:", owners2)
 
-    const hasNewOwner1 = owners1.map(o => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
-    const hasNewOwner2 = owners2.map(o => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
+    const hasNewOwner1 = owners1.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
+    const hasNewOwner2 = owners2.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
 
     if (hasNewOwner1 && hasNewOwner2) {
         console.log("\nNew owner successfully added on BOTH chains with ONE signature!")
@@ -139,14 +141,15 @@ async function sendAndMonitorUserOperation(
 ): Promise<void> {
     const smartAccount = new SafeAccount(userOperation.sender);
     const sendUserOperationResponse = await smartAccount.sendUserOperation(
-        userOperation,
-        bundlerUrl
+        userOperation, bundlerUrl
     )
 
     console.log(`  [${chainName}] UserOperation sent. Waiting for inclusion...`)
     const receipt = await sendUserOperationResponse.included()
 
-    if (receipt.success) {
+    if (receipt == null) {
+        console.log(`  [${chainName}] Receipt not found (timeout)`)
+    } else if (receipt.success) {
         console.log(`  [${chainName}] Success! Tx: ${receipt.receipt.transactionHash}`)
     } else {
         console.log(`  [${chainName}] Execution failed`)

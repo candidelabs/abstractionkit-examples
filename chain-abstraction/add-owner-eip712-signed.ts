@@ -21,13 +21,13 @@ import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
 import {
-    ExperimentalSafeMultiChainSigAccount as SafeAccount,
-    ExperimentalAllowAllParallelPaymaster,
+    SafeMultiChainSigAccountV1 as SafeAccount,
+    CandidePaymaster,
     UserOperationV9,
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2 } = loadMultiChainEnv()
+    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2, paymasterUrl1, paymasterUrl2 } = loadMultiChainEnv()
     const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
     const ownerAccount = privateKeyToAccount(ownerPrivateKey as `0x${string}`)
 
@@ -41,7 +41,6 @@ async function main(): Promise<void> {
     console.log("\nOriginal owner:", ownerPublicAddress)
     console.log("New owner to add:", newOwnerAddress)
 
-    // Initialize Safe Unified Account
     const smartAccount = SafeAccount.initializeNewAccount([ownerPublicAddress])
 
     console.log("\nSafe Account (same on both chains):", smartAccount.accountAddress)
@@ -49,52 +48,45 @@ async function main(): Promise<void> {
     console.log("  - Chain 1:", chainId1.toString())
     console.log("  - Chain 2:", chainId2.toString())
 
-    // Create add owner transaction
     const addOwnerTx = smartAccount.createStandardAddOwnerWithThresholdMetaTransaction(
-        newOwnerAddress,
-        1
+        newOwnerAddress, 1
     );
 
-    // Set up ExperimentalAllowAllParallelPaymaster for gas sponsorship
-    const paymaster = new ExperimentalAllowAllParallelPaymaster();
+    const paymaster1 = new CandidePaymaster(paymasterUrl1)
+    const paymaster2 = new CandidePaymaster(paymasterUrl2)
 
-    const [paymasterInitFields1, paymasterInitFields2] = await Promise.all([
-        paymaster.getPaymasterFieldsInitValues(chainId1),
-        paymaster.getPaymasterFieldsInitValues(chainId2),
-    ]);
+    console.log("\n[1/6] Creating UserOperations for both chains...")
 
-    console.log("\n[1/4] Creating UserOperations for both chains...")
-
-    const [userOperation1, userOperation2] = await Promise.all([
+    let [userOperation1, userOperation2] = await Promise.all([
         smartAccount.createUserOperation(
-            [addOwnerTx],
-            nodeUrl1,
-            bundlerUrl1,
-            {
-                parallelPaymasterInitValues: paymasterInitFields1,
-                preVerificationGasPercentageMultiplier: 120
-            }
+            [addOwnerTx], nodeUrl1, bundlerUrl1,
         ),
         smartAccount.createUserOperation(
-            [addOwnerTx],
-            nodeUrl2,
-            bundlerUrl2,
-            {
-                parallelPaymasterInitValues: paymasterInitFields2,
-                preVerificationGasPercentageMultiplier: 120
-            }
+            [addOwnerTx], nodeUrl2, bundlerUrl2,
         ),
     ]);
 
-    // Prepare the UserOperations to sign
+    console.log("[2/6] Paymaster commit on both chains...")
+
+    const commitOverrides = { preVerificationGasPercentageMultiplier: 120, context: { signingPhase: "commit" as const } };
+    const [[commitOp1], [commitOp2]] = await Promise.all([
+        paymaster1.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation1, bundlerUrl1, undefined, commitOverrides,
+        ),
+        paymaster2.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation2, bundlerUrl2, undefined, commitOverrides,
+        ),
+    ])
+    userOperation1 = commitOp1
+    userOperation2 = commitOp2
+
     const userOperationsToSign = [
         { userOperation: userOperation1, chainId: chainId1 },
         { userOperation: userOperation2, chainId: chainId2 }
     ];
 
-    console.log("[2/4] Getting EIP-712 typed data for signing...")
+    console.log("[3/6] Getting EIP-712 typed data for signing...")
 
-    // Get EIP-712 typed data structure (instead of signing directly with private key)
     const eip712Data = SafeAccount.getMultiChainSingleSignatureUserOperationsEip712Data(
         userOperationsToSign
     );
@@ -102,17 +94,14 @@ async function main(): Promise<void> {
     console.log("  Domain:", JSON.stringify(eip712Data.domain, bigIntReplacer))
     console.log("  Primary type: MerkleTreeRoot")
 
-    console.log("[3/4] Signing with wallet (EIP-712 signTypedData)...")
+    console.log("[4/6] Signing with wallet (EIP-712 signTypedData)...")
 
-    // Create a wallet client (in a real app, this would be MetaMask, WalletConnect, etc.)
     const walletClient = createWalletClient({
         account: ownerAccount,
         chain: sepolia,
         transport: http()
     });
 
-    // Sign the EIP-712 typed data
-    // In a browser, this would trigger a wallet popup
     const signature = await walletClient.signTypedData({
         domain: eip712Data.domain as Parameters<typeof walletClient.signTypedData>[0]['domain'],
         types: eip712Data.types,
@@ -122,9 +111,6 @@ async function main(): Promise<void> {
 
     console.log("  Signature obtained:", signature.slice(0, 20) + "...")
 
-    // Format the single signature into per-UserOperation signatures
-    // Note: safe4337ModuleAddress must be passed to ensure the merkle proof
-    // is computed with the same module address used during EIP-712 data generation
     const signatures = SafeAccount.formatSignaturesToUseroperationsSignatures(
         userOperationsToSign,
         [{ signer: ownerPublicAddress, signature }],
@@ -133,20 +119,24 @@ async function main(): Promise<void> {
 
     console.log("  Formatted into", signatures.length, "UserOperation signatures")
 
-    // Apply signatures
     userOperation1.signature = signatures[0];
     userOperation2.signature = signatures[1];
 
-    // Get paymaster data
-    const [paymasterData1, paymasterData2] = await Promise.all([
-        paymaster.getApprovedPaymasterData(userOperation1),
-        paymaster.getApprovedPaymasterData(userOperation2)
-    ]);
+    console.log("[5/6] Paymaster finalize on both chains...")
 
-    userOperation1.paymasterData = paymasterData1;
-    userOperation2.paymasterData = paymasterData2;
+    const finalizeOverrides = { context: { signingPhase: "finalize" as const } };
+    const [[finalOp1], [finalOp2]] = await Promise.all([
+        paymaster1.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation1, bundlerUrl1, undefined, finalizeOverrides,
+        ),
+        paymaster2.createSponsorPaymasterUserOperation(
+            smartAccount, userOperation2, bundlerUrl2, undefined, finalizeOverrides,
+        ),
+    ])
+    userOperation1 = finalOp1
+    userOperation2 = finalOp2
 
-    console.log("[4/4] Submitting to both chains...")
+    console.log("[6/6] Submitting to both chains...")
 
     await Promise.all([
         sendAndMonitorUserOperation(userOperation1, bundlerUrl1, "Chain 1"),
@@ -167,8 +157,8 @@ async function main(): Promise<void> {
     console.log("\nOwners on Chain 1:", owners1)
     console.log("Owners on Chain 2:", owners2)
 
-    const hasNewOwner1 = owners1.map(o => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
-    const hasNewOwner2 = owners2.map(o => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
+    const hasNewOwner1 = owners1.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
+    const hasNewOwner2 = owners2.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
 
     if (hasNewOwner1 && hasNewOwner2) {
         console.log("\nNew owner successfully added on BOTH chains!")
@@ -183,21 +173,21 @@ async function sendAndMonitorUserOperation(
 ): Promise<void> {
     const smartAccount = new SafeAccount(userOperation.sender);
     const sendUserOperationResponse = await smartAccount.sendUserOperation(
-        userOperation,
-        bundlerUrl
+        userOperation, bundlerUrl
     )
 
     console.log(`  [${chainName}] UserOperation sent. Waiting for inclusion...`)
     const receipt = await sendUserOperationResponse.included()
 
-    if (receipt.success) {
+    if (receipt == null) {
+        console.log(`  [${chainName}] Receipt not found (timeout)`)
+    } else if (receipt.success) {
         console.log(`  [${chainName}] Success! Tx: ${receipt.receipt.transactionHash}`)
     } else {
         console.log(`  [${chainName}] Execution failed`)
     }
 }
 
-// Helper to serialize BigInt values in JSON
 function bigIntReplacer(_key: string, value: unknown): unknown {
     return typeof value === 'bigint' ? value.toString() : value;
 }
