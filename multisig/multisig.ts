@@ -79,7 +79,7 @@ async function main(): Promise<void> {
     const paymaster = new CandidePaymaster(paymasterUrl)
 
     const [paymasterUserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
-        userOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     userOperation = paymasterUserOperation;
 
     const cost = calculateUserOperationMaxGasCost(userOperation)
@@ -112,7 +112,9 @@ async function main(): Promise<void> {
 
     console.log("Useroperation receipt received.")
     console.log(userOperationReceiptResult)
-    if (userOperationReceiptResult.success) {
+    if (userOperationReceiptResult == null) {
+        console.log("Receipt not found (timeout)")
+    } else if (userOperationReceiptResult.success) {
         console.log("Two Nfts were minted. The transaction hash is : " + userOperationReceiptResult.receipt.transactionHash)
     } else {
         console.log("Useroperation execution failed")

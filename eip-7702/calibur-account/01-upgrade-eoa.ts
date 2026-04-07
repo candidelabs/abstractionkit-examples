@@ -39,7 +39,7 @@ async function main(): Promise<void> {
     const smartAccount = new Calibur7702Account(publicAddress)
 
     // Check if the EOA is already delegated to Calibur.
-    const alreadyDelegated = await smartAccount.isDelegated(nodeUrl)
+    const alreadyDelegated = await smartAccount.isDelegatedToThisAccount(nodeUrl)
     if (alreadyDelegated) {
         console.log("This EOA is already delegated to Calibur.")
         console.log("You can run 02-passkeys.ts or 03-manage-keys.ts directly.")
@@ -91,6 +91,9 @@ async function main(): Promise<void> {
     //
     // Option A: Pass private key string
     if (!alreadyDelegated) {
+        if (userOperation.eip7702Auth == null) {
+            throw new Error("eip7702Auth is null after createUserOperation")
+        }
         userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
             BigInt(userOperation.eip7702Auth.chainId),
             userOperation.eip7702Auth.address,
@@ -115,7 +118,7 @@ async function main(): Promise<void> {
     // In EP v0.8, paymaster data is included in the UserOperation hash,
     // so it must be set before signing.
     let [sponsoredUserOperation] = await paymaster.createSponsorPaymasterUserOperation(
-        userOperation, bundlerUrl, sponsorshipPolicyId,
+        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId,
     )
     userOperation = sponsoredUserOperation
 
@@ -142,7 +145,9 @@ async function main(): Promise<void> {
 
     const receipt = await response.included()
 
-    if (receipt.success) {
+    if (receipt == null) {
+        console.log("Receipt not found (timeout)")
+    } else if (receipt.success) {
         if (!alreadyDelegated) {
             console.log("EOA upgraded to Calibur smart account!")
         }

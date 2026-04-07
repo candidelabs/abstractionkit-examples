@@ -83,6 +83,7 @@ async function main(): Promise<void> {
     )
 
     const cost = await paymaster.calculateUserOperationErc20TokenMaxGasCost(
+        smartAccount,
         userOperation,
         tokenSelected.address,
     )
@@ -114,7 +115,9 @@ async function main(): Promise<void> {
 
     console.log("UserOperation receipt received.")
     console.log(receipt)
-    if (receipt.success) {
+    if (receipt == null) {
+        console.log("Receipt not found (timeout)")
+    } else if (receipt.success) {
         console.log("EOA upgraded to a Smart Account and minted two NFTs! Transaction hash: " + receipt.receipt.transactionHash)
     } else {
         console.log("UserOperation execution failed")

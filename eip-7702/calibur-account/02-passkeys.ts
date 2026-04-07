@@ -47,7 +47,7 @@ async function main(): Promise<void> {
     // Check if the EOA is already delegated to the expected Calibur singleton.
     // isDelegated() returns true only if delegated to this account's delegateeAddress.
     // getDelegatedAddress() returns the raw delegatee address for diagnostics.
-    const alreadyDelegated = await smartAccount.isDelegated(nodeUrl)
+    const alreadyDelegated = await smartAccount.isDelegatedToThisAccount(nodeUrl)
     if (!alreadyDelegated) {
         const currentDelegatee = await getDelegatedAddress(publicAddress, nodeUrl);
         if (currentDelegatee) {
@@ -122,6 +122,9 @@ async function main(): Promise<void> {
     )
 
     if (!alreadyDelegated) {
+        if (registerOp.eip7702Auth == null) {
+            throw new Error("eip7702Auth is null after createUserOperation")
+        }
         registerOp.eip7702Auth = createAndSignEip7702DelegationAuthorization(
             BigInt(registerOp.eip7702Auth.chainId),
             registerOp.eip7702Auth.address,
@@ -131,7 +134,7 @@ async function main(): Promise<void> {
     }
 
     let [sponsoredRegisterOp] = await paymaster.createSponsorPaymasterUserOperation(
-        registerOp, bundlerUrl, sponsorshipPolicyId,
+        smartAccount, registerOp, bundlerUrl, sponsorshipPolicyId,
     )
     registerOp = sponsoredRegisterOp
 
@@ -143,6 +146,10 @@ async function main(): Promise<void> {
     const registerResponse = await smartAccount.sendUserOperation(registerOp, bundlerUrl)
     const registerReceipt = await registerResponse.included()
 
+    if (registerReceipt == null) {
+        console.log("Receipt not found (timeout)")
+        return
+    }
     if (!registerReceipt.success) {
         console.log("Registration failed:", registerReceipt)
         return
@@ -191,7 +198,7 @@ async function main(): Promise<void> {
 
     // Sponsor gas before signing (EP v0.8 includes paymaster data in hash)
     let [sponsoredUserOperation] = await paymaster.createSponsorPaymasterUserOperation(
-        userOperation, bundlerUrl, sponsorshipPolicyId,
+        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId,
     )
     userOperation = sponsoredUserOperation
 
@@ -248,7 +255,9 @@ async function main(): Promise<void> {
     console.log("UserOp hash:", response.userOperationHash)
 
     const receipt = await response.included()
-    if (receipt.success) {
+    if (receipt == null) {
+        console.log("Receipt not found (timeout)")
+    } else if (receipt.success) {
         console.log("NFT minted with passkey signature!")
         console.log("Transaction:", receipt.receipt.transactionHash)
     } else {
