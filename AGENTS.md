@@ -36,6 +36,8 @@ NODE_URL1=https://ethereum-sepolia-rpc.publicnode.com
 NODE_URL2=https://sepolia.optimism.io
 CHAIN_ID1=11155111
 CHAIN_ID2=11155420
+SPONSORSHIP_POLICY_ID1=<your-policy-id-chain1>
+SPONSORSHIP_POLICY_ID2=<your-policy-id-chain2>
 ```
 
 Run any example:
@@ -83,6 +85,8 @@ npx ts-node <folder>/<script>.ts
 | `PRIVATE_KEY` | Yes | Your EOA private key (becomes account owner) |
 | `SPONSORSHIP_POLICY_ID` | Optional | For custom sponsorship policies |
 | `TOKEN_ADDRESS` | For ERC-20 gas | Token to pay gas with |
+| `SPONSORSHIP_POLICY_ID1` | For chain-abstraction | Sponsorship policy for chain 1 |
+| `SPONSORSHIP_POLICY_ID2` | For chain-abstraction | Sponsorship policy for chain 2 |
 | `BUNDLER_URL1` | For chain-abstraction | ERC-4337 bundler endpoint |
 | `BUNDLER_URL2` | For chain-abstraction | ERC-4337 bundler endpoint |
 | `NODE_URL1` | For chain-abstraction | Chain 1 RPC endpoint |
