@@ -68,7 +68,7 @@ async function main(): Promise<void> {
 
     console.log("[2/5] Paymaster commit on both chains...")
 
-    const commitOverrides = { preVerificationGasPercentageMultiplier: 20, context: { signingPhase: "commit" as const } };
+    const commitOverrides = { context: { signingPhase: "commit" as const } };
     const [[commitOp1], [commitOp2]] = await Promise.all([
         paymaster1.createSponsorPaymasterUserOperation(
             smartAccount, userOperation1, bundlerUrl1, undefined, commitOverrides,
