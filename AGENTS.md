@@ -36,8 +36,8 @@ NODE_URL1=https://ethereum-sepolia-rpc.publicnode.com
 NODE_URL2=https://sepolia.optimism.io
 CHAIN_ID1=11155111
 CHAIN_ID2=11155420
-SPONSORSHIP_POLICY_ID1=<your-policy-id-chain1>
-SPONSORSHIP_POLICY_ID2=<your-policy-id-chain2>
+SPONSORSHIP_POLICY_ID1=
+SPONSORSHIP_POLICY_ID2=
 ```
 
 Run any example:
