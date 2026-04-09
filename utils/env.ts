@@ -88,6 +88,7 @@ export function loadMultiChainEnv() {
         nodeUrl2: requireEnv('NODE_URL2'),
         paymasterUrl1: requireEnv('PAYMASTER_URL1'),
         paymasterUrl2: requireEnv('PAYMASTER_URL2'),
-        sponsorshipPolicyId: get('SPONSORSHIP_POLICY_ID') || undefined,
+        sponsorshipPolicyId1: get('SPONSORSHIP_POLICY_ID1') || undefined,
+        sponsorshipPolicyId2: get('SPONSORSHIP_POLICY_ID2') || undefined,
     }
 }

@@ -22,7 +22,7 @@ import {
 } from "abstractionkit";
 
 async function main(): Promise<void> {
-    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2, paymasterUrl1, paymasterUrl2 } = loadMultiChainEnv()
+    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2, paymasterUrl1, paymasterUrl2, sponsorshipPolicyId1, sponsorshipPolicyId2 } = loadMultiChainEnv()
     const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
 
     // Generate a new owner address to add
@@ -71,10 +71,10 @@ async function main(): Promise<void> {
     const commitOverrides = { context: { signingPhase: "commit" as const } };
     const [[commitOp1], [commitOp2]] = await Promise.all([
         paymaster1.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation1, bundlerUrl1, undefined, commitOverrides,
+            smartAccount, userOperation1, bundlerUrl1, sponsorshipPolicyId1, commitOverrides,
         ),
         paymaster2.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation2, bundlerUrl2, undefined, commitOverrides,
+            smartAccount, userOperation2, bundlerUrl2, sponsorshipPolicyId2, commitOverrides,
         ),
     ])
     userOperation1 = commitOp1
@@ -99,10 +99,10 @@ async function main(): Promise<void> {
     const finalizeOverrides = { context: { signingPhase: "finalize" as const } };
     const [[finalOp1], [finalOp2]] = await Promise.all([
         paymaster1.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation1, bundlerUrl1, undefined, finalizeOverrides,
+            smartAccount, userOperation1, bundlerUrl1, sponsorshipPolicyId1, finalizeOverrides,
         ),
         paymaster2.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation2, bundlerUrl2, undefined, finalizeOverrides,
+            smartAccount, userOperation2, bundlerUrl2, sponsorshipPolicyId2, finalizeOverrides,
         ),
     ])
     userOperation1 = finalOp1
