@@ -42,40 +42,71 @@ async function main(): Promise<void> {
     console.log("ADD OWNER - PASSKEY (WEBAUTHN) SIGNED DEMO")
     console.log("=".repeat(60))
 
-    console.log("\n[1/8] Creating WebAuthn credential (passkey)...")
-
     const navigator = {
         credentials: new WebAuthnCredentials(),
     }
 
-    const credential = navigator.credentials.create({
-        publicKey: {
-            rp: {
-                name: 'Safe',
-                id: 'safe.global',
-            },
-            user: {
-                id: hexToBytes(keccak256(toBytes('chain-abstraction-demo'))),
-                name: 'demo-user',
-                displayName: 'Demo User',
-            },
-            challenge: numberToBytes(Date.now()),
-            pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-        },
-    })
+    let webauthPublicKey: WebauthnPublicKey
+    let credentialId: string
+    let credentialRawId: ArrayBuffer
 
-    const publicKey = extractPublicKey(credential.response)
-    const webauthPublicKey: WebauthnPublicKey = {
-        x: publicKey.x,
-        y: publicKey.y,
+    if (process.env.PASSKEY_X && process.env.PASSKEY_Y && process.env.PASSKEY_PRIVATE_KEY) {
+        console.log("\n[1/8] Loading existing passkey from environment...")
+
+        webauthPublicKey = {
+            x: BigInt(process.env.PASSKEY_X),
+            y: BigInt(process.env.PASSKEY_Y),
+        }
+
+        const imported = navigator.credentials.importCredential({
+            rpId: 'safe.global',
+            userId: hexToBytes(keccak256(toBytes('chain-abstraction-demo'))),
+            x: webauthPublicKey.x,
+            y: webauthPublicKey.y,
+            privateKeyHex: process.env.PASSKEY_PRIVATE_KEY,
+        })
+
+        credentialId = imported.id
+        credentialRawId = imported.rawId
+
+        console.log("  Passkey loaded from environment!")
+        console.log("  Public key X:", webauthPublicKey.x.toString().slice(0, 20) + "...")
+    } else {
+        console.log("\n[1/8] Creating new WebAuthn credential (passkey)...")
+
+        const credential = navigator.credentials.create({
+            publicKey: {
+                rp: {
+                    name: 'Safe',
+                    id: 'safe.global',
+                },
+                user: {
+                    id: hexToBytes(keccak256(toBytes('chain-abstraction-demo'))),
+                    name: 'demo-user',
+                    displayName: 'Demo User',
+                },
+                challenge: numberToBytes(Date.now()),
+                pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+            },
+        })
+
+        const publicKey = extractPublicKey(credential.response)
+        webauthPublicKey = { x: publicKey.x, y: publicKey.y }
+        credentialId = credential.id
+        credentialRawId = credential.rawId
+
+        const privateKeyHex = navigator.credentials.exportCredentialPrivateKey()
+
+        console.log("  Passkey created!")
+        console.log("  To reuse this passkey across runs, add these to your .env file:")
+        console.log(`  PASSKEY_X=${publicKey.x}`)
+        console.log(`  PASSKEY_Y=${publicKey.y}`)
+        console.log(`  PASSKEY_PRIVATE_KEY=${privateKeyHex}`)
     }
-
-    console.log("  Passkey created!")
-    console.log("  Public key X:", publicKey.x.toString().slice(0, 20) + "...")
 
     const newOwnerAddress = privateKeyToAccount(generatePrivateKey()).address
 
-    console.log("\nPasskey owner (signer):", credential.id.slice(0, 20) + "...")
+    console.log("\nPasskey owner (signer):", credentialId.slice(0, 20) + "...")
     console.log("New owner to add:", newOwnerAddress)
 
     // Initialize Safe Unified Account with passkey as owner
@@ -100,15 +131,17 @@ async function main(): Promise<void> {
     let [userOperation1, userOperation2] = await Promise.all([
         smartAccount.createUserOperation(
             [addOwnerTx], nodeUrl1, bundlerUrl1,
+            {expectedSigners: [webauthPublicKey]}
         ),
         smartAccount.createUserOperation(
             [addOwnerTx], nodeUrl2, bundlerUrl2,
+            {expectedSigners: [webauthPublicKey]}
         ),
     ]);
 
     console.log("[3/8] Paymaster commit on both chains...")
 
-    const commitOverrides = { preVerificationGasPercentageMultiplier: 120, context: { signingPhase: "commit" as const } };
+    const commitOverrides = { context: { signingPhase: "commit" as const } };
     const [[commitOp1], [commitOp2]] = await Promise.all([
         paymaster1.createSponsorPaymasterUserOperation(
             smartAccount, userOperation1, bundlerUrl1, undefined, commitOverrides,
@@ -139,7 +172,7 @@ async function main(): Promise<void> {
         publicKey: {
             challenge: hexToBytes(multiChainHash as `0x${string}`),
             rpId: 'safe.global',
-            allowCredentials: [{ type: 'public-key', id: new Uint8Array(credential.rawId) }],
+            allowCredentials: [{ type: 'public-key', id: new Uint8Array(credentialRawId) }],
             userVerification: UserVerificationRequirement.required,
         },
     })

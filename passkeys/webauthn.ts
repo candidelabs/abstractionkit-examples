@@ -96,15 +96,29 @@ class Credential {
   constructor(
     public rp: string,
     public user: Uint8Array,
+    existingKey?: { x: bigint, y: bigint, privateKeyHex: string },
   ) {
-    const keyPair = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
-    this.privateKey = keyPair.privateKey
+    if (existingKey) {
+      // Import existing key from components
+      const xBuf = Buffer.from(existingKey.x.toString(16).padStart(64, '0'), 'hex')
+      const yBuf = Buffer.from(existingKey.y.toString(16).padStart(64, '0'), 'hex')
+      const dBuf = Buffer.from(existingKey.privateKeyHex.replace(/^0x/, '').padStart(64, '0'), 'hex')
 
-    // Export uncompressed public key (0x04 || x || y)
-    const pubJwk = keyPair.publicKey.export({ format: 'jwk' })
-    const x = Buffer.from(pubJwk.x!, 'base64url')
-    const y = Buffer.from(pubJwk.y!, 'base64url')
-    this.publicKeyUncompressed = new Uint8Array(Buffer.concat([Buffer.from([0x04]), x, y]))
+      this.publicKeyUncompressed = new Uint8Array(Buffer.concat([Buffer.from([0x04]), xBuf, yBuf]))
+      this.privateKey = crypto.createPrivateKey({
+        key: { kty: 'EC', crv: 'P-256', x: xBuf.toString('base64url'), y: yBuf.toString('base64url'), d: dBuf.toString('base64url') },
+        format: 'jwk',
+      })
+    } else {
+      // Generate new key pair
+      const keyPair = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' })
+      this.privateKey = keyPair.privateKey
+
+      const pubJwk = keyPair.publicKey.export({ format: 'jwk' })
+      const x = Buffer.from(pubJwk.x!, 'base64url')
+      const y = Buffer.from(pubJwk.y!, 'base64url')
+      this.publicKeyUncompressed = new Uint8Array(Buffer.concat([Buffer.from([0x04]), x, y]))
+    }
 
     // Credential ID = last 20 bytes of keccak256(pubkey without 0x04 prefix)
     const pubKeyHash = keccak256(toHex(this.publicKeyUncompressed.slice(1)))
@@ -241,6 +255,40 @@ export class WebAuthnCredentials {
       },
       type: 'public-key',
     }
+  }
+
+  /**
+   * Import an existing credential from its key components, so it can be used for signing via get().
+   * The credential ID is deterministically derived from (x, y), so it does not need to be provided.
+   */
+  public importCredential(options: {
+    rpId: string,
+    userId: Uint8Array,
+    x: bigint,
+    y: bigint,
+    privateKeyHex: string,
+  }): { id: string, rawId: ArrayBuffer } {
+    const credential = new Credential(options.rpId, options.userId, {
+      x: options.x,
+      y: options.y,
+      privateKeyHex: options.privateKeyHex,
+    })
+    this.#credentials.push(credential)
+    return {
+      id: base64UrlEncode(credential.id),
+      rawId: b2ab(hexToBytes(credential.id)),
+    }
+  }
+
+  /**
+   * Export the private key scalar (d) of the most recently created credential as a hex string.
+   * Useful for persisting the credential to environment variables.
+   */
+  public exportCredentialPrivateKey(): string {
+    const cred = this.#credentials[this.#credentials.length - 1]
+    if (!cred) throw new Error('no credentials to export')
+    const privJwk = cred.privateKey.export({ format: 'jwk' })
+    return '0x' + Buffer.from(privJwk.d!, 'base64url').toString('hex')
   }
 }
 
