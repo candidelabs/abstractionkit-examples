@@ -156,9 +156,13 @@ const signature = await walletClient.signTypedData({
     message: eip712Data.messageValue
 });
 
-// Format single signature into per-UserOperation signatures
+// Format single signature into per-UserOperation signatures.
+// Per-op overrides (e.g. isInit, safe4337ModuleAddress) live on each entry.
 const signatures = SafeAccount.formatSignaturesToUseroperationsSignatures(
-    [{ userOperation: userOp1, chainId: chainId1 }, { userOperation: userOp2, chainId: chainId2 }],
+    [
+        { userOperation: userOp1, chainId: chainId1 },
+        { userOperation: userOp2, chainId: chainId2 },
+    ],
     [{ signer: ownerAddress, signature }]
 );
 ```

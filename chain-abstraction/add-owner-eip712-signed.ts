@@ -117,7 +117,6 @@ async function main(): Promise<void> {
     const signatures = SafeAccount.formatSignaturesToUseroperationsSignatures(
         userOperationsToSign,
         [{ signer: ownerPublicAddress, signature }],
-        { safe4337ModuleAddress: eip712Data.domain.verifyingContract } as any,
     );
 
     console.log("  Formatted into", signatures.length, "UserOperation signatures")

@@ -101,7 +101,7 @@ const paymaster = new CandidePaymaster(paymasterUrl);
 ### Sponsorship using Policies
 
 ```ts
-const [sponsorUserOp, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation( userOperation, bundlerUrl)
+const [sponsorUserOp, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(smartAccount, userOperation, bundlerUrl)
 
 userOperation = sponsorUserOp
 ```

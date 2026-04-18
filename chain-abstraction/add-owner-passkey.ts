@@ -97,12 +97,17 @@ async function main(): Promise<void> {
 
     console.log("\n[2/8] Creating UserOperations for both chains...")
 
+    // expectedSigners tells the bundler gas estimator to build a realistic
+    // WebAuthn dummy signature using this passkey's pubkey coordinates.
+    // Without it, estimation under-counts verification gas for passkey signers.
+    const createOpOverrides = { expectedSigners: [webauthPublicKey] };
+
     let [userOperation1, userOperation2] = await Promise.all([
         smartAccount.createUserOperation(
-            [addOwnerTx], nodeUrl1, bundlerUrl1,
+            [addOwnerTx], nodeUrl1, bundlerUrl1, createOpOverrides,
         ),
         smartAccount.createUserOperation(
-            [addOwnerTx], nodeUrl2, bundlerUrl2,
+            [addOwnerTx], nodeUrl2, bundlerUrl2, createOpOverrides,
         ),
     ]);
 
@@ -121,8 +126,16 @@ async function main(): Promise<void> {
     userOperation2 = commitOp2
 
     const userOperationsToSign = [
-        { userOperation: userOperation1, chainId: chainId1 },
-        { userOperation: userOperation2, chainId: chainId2 }
+        {
+            userOperation: userOperation1,
+            chainId: chainId1,
+            overrides: { isInit: userOperation1.nonce == 0n },
+        },
+        {
+            userOperation: userOperation2,
+            chainId: chainId2,
+            overrides: { isInit: userOperation2.nonce == 0n },
+        },
     ];
 
     console.log("[4/8] Getting cross-chain EIP-712 hash for signing...")
@@ -164,7 +177,6 @@ async function main(): Promise<void> {
     const signatures = SafeAccount.formatSignaturesToUseroperationsSignatures(
         userOperationsToSign,
         [signerSignaturePair],
-        { isInit: userOperation1.nonce == 0n, safe4337ModuleAddress: SafeAccount.DEFAULT_SAFE_4337_MODULE_ADDRESS } as any,
     );
 
     console.log("  Single passkey signature formatted into", signatures.length, "UserOperation signatures")

@@ -51,9 +51,11 @@ npx ts-node <folder>/<script>.ts
 | Goal | Folder | Key File |
 |------|--------|----------|
 | Gasless transactions | `sponsor-gas/` | `sponsor-gas.ts` |
+| Gasless — any ERC-7677 provider | `erc7677/` | `sponsor-gas.ts` |
 | Passkey/biometric login | `passkeys/` | `index.ts` |
 | Multi-owner wallet | `multisig/` | `multisig.ts` |
 | Pay gas with ERC-20 | `pay-gas-in-erc20/` | `pay-gas-in-erc20.ts` |
+| Pay gas with ERC-20 — any ERC-7677 provider | `erc7677/` | `pay-gas-in-erc20.ts` |
 | Batch multiple txs | `batch-transactions/` | `batch-transactions.ts` |
 | Account recovery | `recovery/` | `recovery.ts` |
 | EIP-7702 delegation | `eip-7702/simple-account/` | `01-upgrade-eoa.ts` |
@@ -154,7 +156,7 @@ let userOp = await smartAccount.createUserOperation(
 
 // 4. (Optional) Add paymaster for sponsorship
 const paymaster = new CandidePaymaster(paymasterUrl);
-[userOp] = await paymaster.createSponsorPaymasterUserOperation(userOp, bundlerUrl);
+[userOp] = await paymaster.createSponsorPaymasterUserOperation(smartAccount, userOp, bundlerUrl);
 
 // 5. Sign
 userOp.signature = smartAccount.signUserOperation(userOp, [privateKey], chainId);

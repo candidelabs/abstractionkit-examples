@@ -45,7 +45,8 @@ export function requireEnv(key: string): string {
  */
 export function getOrCreateOwner(): { publicAddress: string; privateKey: string } {
     const address = process.env.PUBLIC_ADDRESS
-    const key = process.env.PRIVATE_KEY
+    const rawKey = process.env.PRIVATE_KEY
+    const key = rawKey && !rawKey.startsWith('0x') ? `0x${rawKey}` : rawKey
 
     if (address && key) return { publicAddress: address, privateKey: key }
 
