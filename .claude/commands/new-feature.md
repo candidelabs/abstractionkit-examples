@@ -49,7 +49,7 @@ async function main(): Promise<void> {
 
   // 4. Add paymaster for gas sponsorship
   const paymaster = new CandidePaymaster(paymasterUrl);
-  [userOp] = await paymaster.createSponsorPaymasterUserOperation(userOp, bundlerUrl);
+  [userOp] = await paymaster.createSponsorPaymasterUserOperation(smartAccount, userOp, bundlerUrl);
 
   // 5. Sign
   userOp.signature = smartAccount.signUserOperation(userOp, [ownerPrivateKey], chainId);
