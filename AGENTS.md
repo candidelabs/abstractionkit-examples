@@ -134,7 +134,7 @@ Signature doesn't match expected signer(s).
 All examples follow this structure:
 
 ```typescript
-import { SafeAccountV0_3_0 as SafeAccount, MetaTransaction } from "abstractionkit";
+import { SafeAccountV0_3_0 as SafeAccount, MetaTransaction, CandidePaymaster } from "abstractionkit";
 
 // 1. Initialize account
 let smartAccount = SafeAccount.initializeNewAccount([ownerPublicAddress]);

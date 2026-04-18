@@ -47,14 +47,18 @@ async function main(): Promise<void> {
     )
 
     // 4. Sponsor the UserOperation via the ERC-7677 paymaster.
-    //    Note: `sponsorshipPolicyId` is used by Candide and Pimlico.
-    //    Other providers (e.g. Alchemy) expect `policyId` instead.
+    //    Candide and Pimlico read `sponsorshipPolicyId`; Alchemy reads
+    //    `policyId`. We send both so this example is portable across
+    //    providers — unknown keys are ignored.
     const paymaster = new Erc7677Paymaster(paymasterUrl)
+    const context = sponsorshipPolicyId
+        ? { sponsorshipPolicyId, policyId: sponsorshipPolicyId }
+        : {}
     userOperation = await paymaster.createPaymasterUserOperation(
         smartAccount,
         userOperation,
         bundlerUrl,
-        sponsorshipPolicyId ? { sponsorshipPolicyId } : {},
+        context,
     )
 
     const cost = calculateUserOperationMaxGasCost(userOperation)

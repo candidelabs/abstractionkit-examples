@@ -157,11 +157,22 @@ const signature = await walletClient.signTypedData({
 });
 
 // Format single signature into per-UserOperation signatures.
-// Per-op overrides (e.g. isInit, safe4337ModuleAddress) live on each entry.
+// Each entry is { userOperation, chainId, overrides? }. The `overrides`
+// object carries per-op options — typically `isInit` (true when that
+// chain's account is not yet deployed) and optionally
+// `safe4337ModuleAddress` if you're not using the default module.
 const signatures = SafeAccount.formatSignaturesToUseroperationsSignatures(
     [
-        { userOperation: userOp1, chainId: chainId1 },
-        { userOperation: userOp2, chainId: chainId2 },
+        {
+            userOperation: userOp1,
+            chainId: chainId1,
+            overrides: { isInit: userOp1.nonce == 0n },
+        },
+        {
+            userOperation: userOp2,
+            chainId: chainId2,
+            overrides: { isInit: userOp2.nonce == 0n },
+        },
     ],
     [{ signer: ownerAddress, signature }]
 );
