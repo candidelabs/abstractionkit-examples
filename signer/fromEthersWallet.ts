@@ -30,7 +30,7 @@ async function main(): Promise<void> {
 
     // 1. Build the ExternalSigner from an ethers Wallet. In a real app
     //    the Wallet comes from wherever you already create one (new
-    //    Wallet(pk), HDNodeWallet.fromPhrase, provider.getSigner(), ...).
+    //    Wallet(pk), HDNodeWallet.fromPhrase, ...).
     const wallet = new Wallet(privateKey)
     const signer: ExternalSigner = fromEthersWallet(wallet)
     logSigner('fromEthersWallet', signer)

@@ -20,15 +20,20 @@ use ethers, read `fromEthersWallet.ts`. You do not need to install both.
 ## Shape
 
 ```ts
-interface ExternalSigner {
-  address: `0x${string}`
-  signHash?(hash: `0x${string}`): Promise<`0x${string}`>
-  signTypedData?(data: TypedData): Promise<`0x${string}`>
-}
+type ExternalSigner = { address: `0x${string}` } & (
+  | { signHash:       (hash: `0x${string}`) => Promise<`0x${string}`>
+      signTypedData?: (data: TypedData)     => Promise<`0x${string}`> }
+  | { signHash?:      (hash: `0x${string}`) => Promise<`0x${string}`>
+      signTypedData:  (data: TypedData)     => Promise<`0x${string}`> }
+)
 ```
 
-At least one of `signHash` / `signTypedData` is required. The discriminated
-union rejects `{ address }` with neither method at compile time.
+The discriminated union enforces that at least one of `signHash` or
+`signTypedData` is provided; `{ address }` with neither method is rejected
+at compile time.
+
+Canonical definition: [`Signer` in abstractionkit's `src/signer/types.ts`](https://github.com/candidelabs/abstractionkit/blob/main/src/signer/types.ts),
+re-exported from the package root as `ExternalSigner`.
 
 ## Calling it
 

@@ -64,8 +64,11 @@ userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
 
 Starting in abstractionkit v0.3.2, `signUserOperationWithSigner` accepts any
 `ExternalSigner` so you don't have to pass a raw private key into the SDK.
-Use one of the built-in adapters (`fromViem`, `fromEthersWallet`, `fromPrivateKey`,
-`fromViemWalletClient`) or supply an inline object that matches the shape:
+Simple7702 and Calibur validate via raw hash signing, so the signer must
+implement `signHash`. Use one of the hash-capable adapters (`fromViem`,
+`fromEthersWallet`, `fromPrivateKey`) or supply an inline object with
+`signHash`. `fromViemWalletClient` exposes only `signTypedData` and is
+rejected offline on this path.
 
 ```ts
 import { fromViem } from "abstractionkit"
