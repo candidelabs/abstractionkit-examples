@@ -1,68 +1,65 @@
-// ExternalSigner adapter: fromEthersWallet -> signHash + signTypedData
-//
-// Use this adapter when your project already depends on ethers (>=6).
-// This is the ONLY hub file that imports ethers; every other adapter
-// works without it. If you don't use ethers, skip this file.
-//
-// Why it exists: ethers users don't need to swap to viem to get signer
-// support in abstractionkit.
+/**
+ * ExternalSigner adapter: fromEthersWallet
+ *
+ * Wrap any ethers v6 `Wallet` or `HDNodeWallet`.
+ *
+ * Use this file if your project already depends on ethers. It is the
+ * ONLY hub example that imports ethers; every other adapter works
+ * without it, so you don't need both libraries installed.
+ *
+ * Both `signHash` and `signTypedData` are exposed; Safe accounts
+ * negotiate and pick `signTypedData` for structured EIP-712 display.
+ */
 
-import { loadEnv, getOrCreateOwner } from '../utils/env'
-import { Wallet } from 'ethers'
 import {
-    SafeAccountV0_3_0 as SafeAccount,
     Erc7677Paymaster,
     ExternalSigner,
+    MetaTransaction,
+    SafeAccountV0_3_0 as SafeAccount,
+    createCallData,
     fromEthersWallet,
     getFunctionSelector,
-    createCallData,
-    MetaTransaction,
 } from 'abstractionkit'
+import { Wallet } from 'ethers'
+
+import { getOrCreateOwner, loadEnv } from '../utils/env'
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
     const { privateKey } = getOrCreateOwner()
 
-    // 1. Build the ExternalSigner from an ethers Wallet. In a real app,
+    // 1. Build the ExternalSigner from an ethers Wallet. In a real app
     //    the Wallet comes from wherever you already create one (new
-    //    Wallet(pk), HDNodeWallet.fromPhrase, ethers.getSigner(), ...).
+    //    Wallet(pk), HDNodeWallet.fromPhrase, provider.getSigner(), ...).
     const wallet = new Wallet(privateKey)
     const signer: ExternalSigner = fromEthersWallet(wallet)
-    console.log('Adapter       : fromEthersWallet')
-    console.log('Capabilities  : signHash=%s signTypedData=%s',
-        typeof signer.signHash === 'function',
-        typeof signer.signTypedData === 'function')
-    console.log('Signer address:', signer.address)
+    logSigner('fromEthersWallet', signer)
 
-    // 2. Standard Safe flow.
+    // 2. Initialize a counterfactual Safe with the signer as its sole owner.
     const smartAccount = SafeAccount.initializeNewAccount([signer.address])
-    console.log('Safe (sender) :', smartAccount.accountAddress)
+    console.log('Safe          :', smartAccount.accountAddress)
 
-    const nft = '0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336'
-    const mintTx: MetaTransaction = {
-        to: nft,
-        value: 0n,
-        data: createCallData(
-            getFunctionSelector('mint(address)'),
-            ['address'],
-            [smartAccount.accountAddress],
-        ),
-    }
+    // 3. Build a MetaTransaction: mint an NFT to the Safe.
+    const mintTx: MetaTransaction = mintNftTransaction(smartAccount.accountAddress)
 
+    // 4. Assemble the UserOperation.
     let userOp = await smartAccount.createUserOperation(
         [mintTx], nodeUrl, bundlerUrl,
     )
 
+    // 5. Sponsor gas via an ERC-7677 paymaster (provider-agnostic).
     const paymaster = new Erc7677Paymaster(paymasterUrl)
     userOp = await paymaster.createPaymasterUserOperation(
         smartAccount, userOp, bundlerUrl,
         sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
 
+    // 6. Sign with the ExternalSigner.
     userOp.signature = await smartAccount.signUserOperationWithSigners(
         userOp, [signer], chainId,
     )
 
+    // 7. Send and wait for on-chain inclusion.
     const response = await smartAccount.sendUserOperation(userOp, bundlerUrl)
     console.log('UserOp hash   :', response.userOperationHash)
     const receipt = await response.included()
@@ -70,6 +67,27 @@ async function main(): Promise<void> {
     console.log('Tx            :', receipt.receipt.transactionHash)
     console.log('Success       :', receipt.success)
     if (!receipt.success) throw new Error('reverted on-chain')
+}
+
+function logSigner(adapter: string, signer: ExternalSigner): void {
+    console.log('Adapter       :', adapter)
+    console.log('Capabilities  : signHash=%s signTypedData=%s',
+        typeof signer.signHash === 'function',
+        typeof signer.signTypedData === 'function')
+    console.log('Signer address:', signer.address)
+}
+
+function mintNftTransaction(to: string): MetaTransaction {
+    const nft = '0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336'
+    return {
+        to: nft,
+        value: 0n,
+        data: createCallData(
+            getFunctionSelector('mint(address)'),
+            ['address'],
+            [to],
+        ),
+    }
 }
 
 main().catch((err: unknown) => {

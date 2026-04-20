@@ -7,15 +7,17 @@ These examples demonstrate how to upgrade an EOA to a Smart Account with EIP-770
 ```text
 eip-7702/
 ├── simple-account/       # Simple7702Account examples
-│   ├── 01-upgrade-eoa.ts                 # Upgrade EOA + batch mint NFTs (sponsored gas)
-│   ├── 02-upgrade-eoa-external-signer.ts # Upgrade EOA with external signer (viem Account)
-│   ├── 03-upgrade-eoa-erc20-gas.ts       # Upgrade EOA with ERC-20 token gas payment
-│   ├── 04-upgrade-eoa-ep-v09.ts          # Upgrade EOA using EntryPoint v0.9
-│   └── 05-revoke-delegation.ts           # Revoke EIP-7702 delegation
+│   ├── 01-upgrade-eoa.ts            # Upgrade EOA + batch mint NFTs (sponsored gas)
+│   ├── 03-upgrade-eoa-erc20-gas.ts  # Upgrade EOA with ERC-20 token gas payment
+│   ├── 04-upgrade-eoa-ep-v09.ts     # Upgrade EOA using EntryPoint v0.9
+│   ├── 05-revoke-delegation.ts      # Revoke EIP-7702 delegation
+│   ├── 06-external-signer.ts        # Upgrade EOA with the v0.3.2 ExternalSigner API
+│   └── 07-external-signer-v09.ts    # Same, EntryPoint v0.9 (two-phase paymaster)
 └── calibur-account/      # Calibur7702Account examples (passkeys, key management)
     ├── 01-upgrade-eoa.ts
     ├── 02-passkeys.ts
-    └── 03-manage-keys.ts
+    ├── 03-manage-keys.ts
+    └── 04-external-signer.ts        # Calibur with the v0.3.2 ExternalSigner API
 ```
 
 ## Simple7702Account
@@ -58,22 +60,31 @@ userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
 )
 ```
 
-With an external signer (callback pattern):
+### UserOperation Signing with an External Signer
+
+Starting in abstractionkit v0.3.2, `signUserOperationWithSigner` accepts any
+`ExternalSigner` so you don't have to pass a raw private key into the SDK.
+Use one of the built-in adapters (`fromViem`, `fromEthersWallet`, `fromPrivateKey`,
+`fromViemWalletClient`) or supply an inline object that matches the shape:
 
 ```ts
-userOperation.eip7702Auth = await createAndSignEip7702DelegationAuthorization(
-    BigInt(userOperation.eip7702Auth.chainId),
-    userOperation.eip7702Auth.address,
-    BigInt(userOperation.eip7702Auth.nonce),
-    async (hash: string) => {
-        // Raw hash signing — any signer (hardware wallet, WalletConnect, etc.)
-        // Important: use account.sign(), NOT signMessage() (which adds EIP-191 prefix)
-        return await account.sign({ hash: hash as `0x${string}` });
-    }
+import { fromViem } from "abstractionkit"
+import { privateKeyToAccount } from "viem/accounts"
+
+const signer = fromViem(privateKeyToAccount(privateKey))
+userOp.signature = await smartAccount.signUserOperationWithSigner(
+  userOp, signer, chainId,
 )
 ```
 
-See `simple-account/02-upgrade-eoa-external-signer.ts` for the full example.
+See `simple-account/06-external-signer.ts` for the end-to-end Simple7702 flow,
+`simple-account/07-external-signer-v09.ts` for the EntryPoint v0.9 variant, and
+`calibur-account/04-external-signer.ts` for Calibur. The `signer/` folder at the
+repo root contains one self-contained example per adapter.
+
+Note: the **delegation authorization** (`createAndSignEip7702DelegationAuthorization`)
+still takes the raw private key. It is a separate signature from the UserOperation
+signature and is required by the EIP-7702 transaction type itself.
 
 ### Revoking Delegation
 

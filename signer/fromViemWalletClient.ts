@@ -1,42 +1,42 @@
-// ExternalSigner adapter: fromViemWalletClient -> signTypedData only
-//
-// Use this adapter when you hold a viem `WalletClient` (the client-style
-// API dApps use to drive browser / WalletConnect / JSON-RPC wallets).
-// WalletClient cannot sign raw hashes (JSON-RPC wallets refuse), so
-// this adapter exposes only signTypedData.
-//
-// Capability caveat: this signer will NOT work on the multi-op Merkle
-// path (SafeMultiChainSigAccountV1.signUserOperationsWithSigners). That
-// path requires signHash, and pickScheme will throw offline with an
-// actionable error naming this adapter. Use fromViem instead when you
-// need multi-op.
-//
-// For local accounts (privateKeyToAccount), pass the LocalAccount to
-// fromViem instead of wrapping it in a WalletClient. You'll get raw-
-// hash support for free.
+/**
+ * ExternalSigner adapter: fromViemWalletClient
+ *
+ * Wrap a viem `WalletClient`: the client-style API dApps use to drive
+ * browser wallets, WalletConnect, or other JSON-RPC providers.
+ *
+ * Only `signTypedData` is exposed. JSON-RPC wallets cannot sign raw
+ * hashes, so this adapter intentionally omits `signHash`.
+ *
+ * Consequence: this signer will NOT work on the multi-op Merkle path
+ * (`SafeMultiChainSigAccountV1.signUserOperationsWithSigners`), which
+ * requires `signHash`. Capability negotiation throws offline with an
+ * actionable error naming this adapter. Use `fromViem` with the
+ * underlying `LocalAccount` when you need raw-hash support.
+ */
 
-import { loadEnv, getOrCreateOwner } from '../utils/env'
+import {
+    Erc7677Paymaster,
+    ExternalSigner,
+    MetaTransaction,
+    SafeAccountV0_3_0 as SafeAccount,
+    createCallData,
+    fromViemWalletClient,
+    getFunctionSelector,
+} from 'abstractionkit'
 import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { arbitrumSepolia } from 'viem/chains'
-import {
-    SafeAccountV0_3_0 as SafeAccount,
-    Erc7677Paymaster,
-    ExternalSigner,
-    fromViemWalletClient,
-    getFunctionSelector,
-    createCallData,
-    MetaTransaction,
-} from 'abstractionkit'
+
+import { getOrCreateOwner, loadEnv } from '../utils/env'
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
     const { privateKey } = getOrCreateOwner()
 
-    // 1. Build the ExternalSigner from a viem WalletClient.
-    //    A LocalAccount is attached here so the example is runnable
-    //    without a browser; in a dApp the account would come from a
-    //    browser wallet / WalletConnect / injected provider.
+    // 1. Build the ExternalSigner from a viem WalletClient. A LocalAccount
+    //    is attached here so the example is runnable from node; in a
+    //    real dApp the account comes from a browser wallet / WalletConnect
+    //    / injected provider.
     const localAccount = privateKeyToAccount(privateKey as `0x${string}`)
     const walletClient = createWalletClient({
         account: localAccount,
@@ -44,41 +44,34 @@ async function main(): Promise<void> {
         transport: http(nodeUrl),
     })
     const signer: ExternalSigner = fromViemWalletClient(walletClient)
-    console.log('Adapter       : fromViemWalletClient')
-    console.log('Capabilities  : signHash=%s signTypedData=%s',
-        typeof signer.signHash === 'function',
-        typeof signer.signTypedData === 'function')
-    console.log('Signer address:', signer.address)
+    logSigner('fromViemWalletClient', signer)
 
-    // 2. Standard Safe flow.
+    // 2. Initialize a counterfactual Safe with the signer as its sole owner.
     const smartAccount = SafeAccount.initializeNewAccount([signer.address])
-    console.log('Safe (sender) :', smartAccount.accountAddress)
+    console.log('Safe          :', smartAccount.accountAddress)
 
-    const nft = '0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336'
-    const mintTx: MetaTransaction = {
-        to: nft,
-        value: 0n,
-        data: createCallData(
-            getFunctionSelector('mint(address)'),
-            ['address'],
-            [smartAccount.accountAddress],
-        ),
-    }
+    // 3. Build a MetaTransaction: mint an NFT to the Safe.
+    const mintTx: MetaTransaction = mintNftTransaction(smartAccount.accountAddress)
 
+    // 4. Assemble the UserOperation.
     let userOp = await smartAccount.createUserOperation(
         [mintTx], nodeUrl, bundlerUrl,
     )
 
+    // 5. Sponsor gas via an ERC-7677 paymaster (provider-agnostic).
     const paymaster = new Erc7677Paymaster(paymasterUrl)
     userOp = await paymaster.createPaymasterUserOperation(
         smartAccount, userOp, bundlerUrl,
         sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
 
+    // 6. Sign with the ExternalSigner. Safe negotiates and uses
+    //    signTypedData (the only capability this adapter exposes).
     userOp.signature = await smartAccount.signUserOperationWithSigners(
         userOp, [signer], chainId,
     )
 
+    // 7. Send and wait for on-chain inclusion.
     const response = await smartAccount.sendUserOperation(userOp, bundlerUrl)
     console.log('UserOp hash   :', response.userOperationHash)
     const receipt = await response.included()
@@ -86,6 +79,27 @@ async function main(): Promise<void> {
     console.log('Tx            :', receipt.receipt.transactionHash)
     console.log('Success       :', receipt.success)
     if (!receipt.success) throw new Error('reverted on-chain')
+}
+
+function logSigner(adapter: string, signer: ExternalSigner): void {
+    console.log('Adapter       :', adapter)
+    console.log('Capabilities  : signHash=%s signTypedData=%s',
+        typeof signer.signHash === 'function',
+        typeof signer.signTypedData === 'function')
+    console.log('Signer address:', signer.address)
+}
+
+function mintNftTransaction(to: string): MetaTransaction {
+    const nft = '0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336'
+    return {
+        to: nft,
+        value: 0n,
+        data: createCallData(
+            getFunctionSelector('mint(address)'),
+            ['address'],
+            [to],
+        ),
+    }
 }
 
 main().catch((err: unknown) => {

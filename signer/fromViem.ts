@@ -1,69 +1,62 @@
-// ExternalSigner adapter: fromViem -> signHash + signTypedData
-//
-// Use this adapter when you already hold a viem `LocalAccount`
-// (the most common shape in viem-first projects). Exposes both
-// capabilities; when Safe negotiates, it picks signTypedData so the
-// user sees structured EIP-712 fields instead of an opaque hex blob.
-//
-// Why it exists: avoids round-tripping your viem Account through a raw
-// pk string just to get a signature.
+/**
+ * ExternalSigner adapter: fromViem
+ *
+ * Wrap any viem `LocalAccount` (e.g. `privateKeyToAccount`, `toAccount`,
+ * a wagmi connector's underlying account).
+ *
+ * Best for viem-first projects. Both `signHash` and `signTypedData` are
+ * exposed; Safe accounts negotiate and pick `signTypedData` for
+ * structured EIP-712 display.
+ */
 
-import { loadEnv, getOrCreateOwner } from '../utils/env'
-import { privateKeyToAccount } from 'viem/accounts'
 import {
-    SafeAccountV0_3_0 as SafeAccount,
     Erc7677Paymaster,
     ExternalSigner,
+    MetaTransaction,
+    SafeAccountV0_3_0 as SafeAccount,
+    createCallData,
     fromViem,
     getFunctionSelector,
-    createCallData,
-    MetaTransaction,
 } from 'abstractionkit'
+import { privateKeyToAccount } from 'viem/accounts'
+
+import { getOrCreateOwner, loadEnv } from '../utils/env'
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
     const { privateKey } = getOrCreateOwner()
 
-    // 1. Build the ExternalSigner from a viem LocalAccount. In a real
-    //    app, this LocalAccount comes from wherever you already create
-    //    one (privateKeyToAccount, toAccount, a wagmi connector, ...).
+    // 1. Build the ExternalSigner from a viem LocalAccount. In a real app
+    //    the LocalAccount comes from wherever you already create one.
     const localAccount = privateKeyToAccount(privateKey as `0x${string}`)
     const signer: ExternalSigner = fromViem(localAccount)
-    console.log('Adapter       : fromViem')
-    console.log('Capabilities  : signHash=%s signTypedData=%s',
-        typeof signer.signHash === 'function',
-        typeof signer.signTypedData === 'function')
-    console.log('Signer address:', signer.address)
+    logSigner('fromViem', signer)
 
-    // 2. Standard Safe flow.
+    // 2. Initialize a counterfactual Safe with the signer as its sole owner.
     const smartAccount = SafeAccount.initializeNewAccount([signer.address])
-    console.log('Safe (sender) :', smartAccount.accountAddress)
+    console.log('Safe          :', smartAccount.accountAddress)
 
-    const nft = '0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336'
-    const mintTx: MetaTransaction = {
-        to: nft,
-        value: 0n,
-        data: createCallData(
-            getFunctionSelector('mint(address)'),
-            ['address'],
-            [smartAccount.accountAddress],
-        ),
-    }
+    // 3. Build a MetaTransaction: mint an NFT to the Safe.
+    const mintTx: MetaTransaction = mintNftTransaction(smartAccount.accountAddress)
 
+    // 4. Assemble the UserOperation.
     let userOp = await smartAccount.createUserOperation(
         [mintTx], nodeUrl, bundlerUrl,
     )
 
+    // 5. Sponsor gas via an ERC-7677 paymaster (provider-agnostic).
     const paymaster = new Erc7677Paymaster(paymasterUrl)
     userOp = await paymaster.createPaymasterUserOperation(
         smartAccount, userOp, bundlerUrl,
         sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
 
+    // 6. Sign with the ExternalSigner.
     userOp.signature = await smartAccount.signUserOperationWithSigners(
         userOp, [signer], chainId,
     )
 
+    // 7. Send and wait for on-chain inclusion.
     const response = await smartAccount.sendUserOperation(userOp, bundlerUrl)
     console.log('UserOp hash   :', response.userOperationHash)
     const receipt = await response.included()
@@ -71,6 +64,27 @@ async function main(): Promise<void> {
     console.log('Tx            :', receipt.receipt.transactionHash)
     console.log('Success       :', receipt.success)
     if (!receipt.success) throw new Error('reverted on-chain')
+}
+
+function logSigner(adapter: string, signer: ExternalSigner): void {
+    console.log('Adapter       :', adapter)
+    console.log('Capabilities  : signHash=%s signTypedData=%s',
+        typeof signer.signHash === 'function',
+        typeof signer.signTypedData === 'function')
+    console.log('Signer address:', signer.address)
+}
+
+function mintNftTransaction(to: string): MetaTransaction {
+    const nft = '0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336'
+    return {
+        to: nft,
+        value: 0n,
+        data: createCallData(
+            getFunctionSelector('mint(address)'),
+            ['address'],
+            [to],
+        ),
+    }
 }
 
 main().catch((err: unknown) => {
