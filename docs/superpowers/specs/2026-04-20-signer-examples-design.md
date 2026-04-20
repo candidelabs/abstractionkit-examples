@@ -203,10 +203,11 @@ Append a column to the Account Types table:
 
 ## Paymaster convention
 
-- New signer examples (hub + 5 account starters): use `Erc7677Paymaster`.
-- Existing non-signer examples: untouched, still on `CandidePaymaster`.
+- New signer examples: use `Erc7677Paymaster` by default.
+- **Exception for EntryPoint v0.9**: `Erc7677Paymaster` does not support EP v0.9. The two files that target EP v0.9 (`eip-7702/simple-account/07-external-signer-v09.ts` and `chain-abstraction/add-owner-with-external-signer.ts`) use `CandidePaymaster` and its two-phase signing flow (`signingPhase: "commit"` then `"finalize"` around the owner sign step). Each of these files carries a comment block explaining the exception.
+- Existing non-signer examples: untouched, still on their existing paymaster choice.
 
-Rationale: keeps the PR diff scoped to the signer story. A later PR can migrate the rest of the repo to `Erc7677Paymaster` if that is desired.
+Rationale: keeps the signer-API story consistent where the protocol allows, and calls out the v0.9-specific constraint in both files so a reader doesn't copy the wrong paymaster into a v0.9 flow.
 
 ## Dependencies
 
