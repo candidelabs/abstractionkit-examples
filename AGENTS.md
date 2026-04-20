@@ -86,7 +86,6 @@ New in abstractionkit v0.3.2: the `ExternalSigner` API lets you plug viem, ether
 | Raw private key | `signer/` | `fromPrivateKey.ts` |
 | viem WalletClient (typed-data path) | `signer/` | `fromViemWalletClient.ts` |
 | Custom (HSM / MPC / hardware) | `signer/` | `customSigner.ts` |
-| Gasless transactions (external signer) | `sponsor-gas/` | `sponsor-gas-external-signer.ts` |
 | Simple7702 external signer | `eip-7702/simple-account/` | `06-external-signer.ts` |
 | Simple7702 EP v0.9 external signer | `eip-7702/simple-account/` | `07-external-signer-v09.ts` |
 | Calibur external signer | `eip-7702/calibur-account/` | `04-external-signer.ts` |
@@ -163,7 +162,7 @@ For HSM / MPC / hardware wallets, pass an inline object matching `ExternalSigner
 
 Signing is async. Capability mismatches (e.g. a typed-data-only signer against a hash-only account) throw offline with an actionable message, so no HSM / hardware prompt fires on a trip that would fail anyway.
 
-Canonical per-adapter examples: `signer/`. Account-specific starters: `sponsor-gas/sponsor-gas-external-signer.ts`, `eip-7702/*/0X-external-signer*.ts`, `chain-abstraction/add-owner-with-external-signer.ts`.
+Canonical per-adapter examples: `signer/`. Account-specific starters for the flows that differ from the standard Safe-sponsored flow: `eip-7702/*/0X-external-signer*.ts`, `chain-abstraction/add-owner-with-external-signer.ts`.
 
 ## Code Pattern
 
