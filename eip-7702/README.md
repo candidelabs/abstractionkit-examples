@@ -8,11 +8,11 @@ These examples demonstrate how to upgrade an EOA to a Smart Account with EIP-770
 eip-7702/
 ├── simple-account/       # Simple7702Account examples
 │   ├── 01-upgrade-eoa.ts            # Upgrade EOA + batch mint NFTs (sponsored gas)
-│   ├── 03-upgrade-eoa-erc20-gas.ts  # Upgrade EOA with ERC-20 token gas payment
-│   ├── 04-upgrade-eoa-ep-v09.ts     # Upgrade EOA using EntryPoint v0.9
-│   ├── 05-revoke-delegation.ts      # Revoke EIP-7702 delegation
-│   ├── 06-external-signer.ts        # Upgrade EOA with the v0.3.2 ExternalSigner API
-│   └── 07-external-signer-v09.ts    # Same, EntryPoint v0.9 (two-phase paymaster)
+│   ├── 02-upgrade-eoa-erc20-gas.ts  # Upgrade EOA with ERC-20 token gas payment
+│   ├── 03-upgrade-eoa-ep-v09.ts     # Upgrade EOA using EntryPoint v0.9
+│   ├── 04-revoke-delegation.ts      # Revoke EIP-7702 delegation
+│   ├── 05-external-signer.ts        # Upgrade EOA with the v0.3.2 ExternalSigner API
+│   └── 06-external-signer-v09.ts    # Same, EntryPoint v0.9 (two-phase paymaster)
 └── calibur-account/      # Calibur7702Account examples (passkeys, key management)
     ├── 01-upgrade-eoa.ts
     ├── 02-passkeys.ts
@@ -80,8 +80,8 @@ userOp.signature = await smartAccount.signUserOperationWithSigner(
 )
 ```
 
-See `simple-account/06-external-signer.ts` for the end-to-end Simple7702 flow,
-`simple-account/07-external-signer-v09.ts` for the EntryPoint v0.9 variant, and
+See `simple-account/05-external-signer.ts` for the end-to-end Simple7702 flow,
+`simple-account/06-external-signer-v09.ts` for the EntryPoint v0.9 variant, and
 `calibur-account/04-external-signer.ts` for Calibur. The `signer/` folder at the
 repo root contains one self-contained example per adapter.
 
@@ -100,7 +100,7 @@ const signedTransaction = await smartAccount.createRevokeDelegationTransaction(
 );
 ```
 
-This creates a signed transaction that delegates to address zero, effectively removing the smart account code from the EOA. See `simple-account/05-revoke-delegation.ts` for the full example.
+This creates a signed transaction that delegates to address zero, effectively removing the smart account code from the EOA. See `simple-account/04-revoke-delegation.ts` for the full example.
 
 ## Gas Sponsorship with Paymaster
 

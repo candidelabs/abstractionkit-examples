@@ -59,9 +59,9 @@ npx ts-node <folder>/<script>.ts
 | Batch multiple txs | `batch-transactions/` | `batch-transactions.ts` |
 | Account recovery | `recovery/` | `recovery.ts` |
 | EIP-7702 delegation | `eip-7702/simple-account/` | `01-upgrade-eoa.ts` |
-| EIP-7702 pay gas in ERC-20 | `eip-7702/simple-account/` | `03-upgrade-eoa-erc20-gas.ts` |
-| EIP-7702 EP v0.9 | `eip-7702/simple-account/` | `04-upgrade-eoa-ep-v09.ts` |
-| EIP-7702 revoke delegation | `eip-7702/simple-account/` | `05-revoke-delegation.ts` |
+| EIP-7702 pay gas in ERC-20 | `eip-7702/simple-account/` | `02-upgrade-eoa-erc20-gas.ts` |
+| EIP-7702 EP v0.9 | `eip-7702/simple-account/` | `03-upgrade-eoa-ep-v09.ts` |
+| EIP-7702 revoke delegation | `eip-7702/simple-account/` | `04-revoke-delegation.ts` |
 | Debug with Tenderly | `simulate-with-tenderly/` | `simulate-with-tenderly.ts` |
 | Multichain-chain add owner | `chain-abstraction/` | `add-owner.ts` |
 | Multichain add guardian | `chain-abstraction/` | `add-guardian.ts` |
@@ -83,11 +83,10 @@ New in abstractionkit v0.3.2: the `ExternalSigner` API lets you plug viem, ether
 | Overview + adapter matrix | `signer/` | `README.md` |
 | viem LocalAccount | `signer/` | `fromViem.ts` |
 | ethers Wallet | `signer/` | `fromEthersWallet.ts` |
-| Raw private key | `signer/` | `fromPrivateKey.ts` |
 | viem WalletClient (typed-data path) | `signer/` | `fromViemWalletClient.ts` |
 | Custom (HSM / MPC / hardware) | `signer/` | `customSigner.ts` |
-| Simple7702 external signer | `eip-7702/simple-account/` | `06-external-signer.ts` |
-| Simple7702 EP v0.9 external signer | `eip-7702/simple-account/` | `07-external-signer-v09.ts` |
+| Simple7702 external signer | `eip-7702/simple-account/` | `05-external-signer.ts` |
+| Simple7702 EP v0.9 external signer | `eip-7702/simple-account/` | `06-external-signer-v09.ts` |
 | Calibur external signer | `eip-7702/calibur-account/` | `04-external-signer.ts` |
 | Multichain add owner (external signer) | `chain-abstraction/` | `add-owner-with-external-signer.ts` |
 
@@ -149,16 +148,17 @@ Signature doesn't match expected signer(s).
 
 Use `signUserOperationWithSigners` (Safe, multi-signer array) or `signUserOperationWithSigner` (Simple7702 / Calibur, single signer) with an `ExternalSigner` to avoid passing raw private keys into the SDK.
 
-Four built-in adapters cover the common cases:
+Three built-in adapters cover the common cases:
 
 | Adapter | For |
 |---|---|
-| `fromPrivateKey(pk)` | Raw 0x hex string; zero dependencies |
 | `fromViem(localAccount)` | Any `viem` `LocalAccount` (most projects) |
 | `fromEthersWallet(wallet)` | Any `ethers.Wallet` / `HDNodeWallet` |
 | `fromViemWalletClient(client)` | `viem` `WalletClient` (typed-data only; no multi-op) |
 
 For HSM / MPC / hardware wallets, pass an inline object matching `ExternalSigner`: `{ address, signHash?(hash): Promise<hex>, signTypedData?(data): Promise<hex> }`. At least one of `signHash` or `signTypedData` is required (compile-time check).
+
+If all you have is a raw 0x-hex private key, the shortest path is the legacy sync API: `safe.signUserOperation(userOp, [privateKey], chainId)`. A `fromPrivateKey(pk)` adapter is also exported for multi-owner setups where pk and HSM owners need to flow through the same async interface.
 
 Signing is async. Capability mismatches (e.g. a typed-data-only signer against a hash-only account) throw offline with an actionable message, so no HSM / hardware prompt fires on a trip that would fail anyway.
 

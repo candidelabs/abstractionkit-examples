@@ -8,7 +8,6 @@ to the SDK.
 
 | Adapter | For | Example |
 |---|---|---|
-| `fromPrivateKey(pk)` | Raw 0x hex string, zero extra dependencies | [fromPrivateKey.ts](./fromPrivateKey.ts) |
 | `fromViem(localAccount)` | Any `viem` `LocalAccount` | [fromViem.ts](./fromViem.ts) |
 | `fromEthersWallet(wallet)` | Any `ethers.Wallet` / `HDNodeWallet` (>= 6) | [fromEthersWallet.ts](./fromEthersWallet.ts) |
 | `fromViemWalletClient(client)` | `viem` `WalletClient`, typed-data only | [fromViemWalletClient.ts](./fromViemWalletClient.ts) |
@@ -16,6 +15,21 @@ to the SDK.
 
 Each file is self-contained. If you use viem, read `fromViem.ts`; if you
 use ethers, read `fromEthersWallet.ts`. You do not need to install both.
+
+### What about a raw private key?
+
+If you already have a plain 0x-hex private key, the shortest path is the
+legacy sync API:
+
+```ts
+userOp.signature = safe.signUserOperation(userOp, [privateKey], chainId)
+```
+
+abstractionkit also exports a `fromPrivateKey(pk)` adapter that wraps a
+pk into an `ExternalSigner`. It is intended for multi-owner setups where
+you want every owner (pk, HSM, hardware wallet) to flow through the same
+async interface. For a single-owner pk use case, the sync API is simpler
+and requires no extra wrapping.
 
 ## Shape
 
@@ -64,11 +78,9 @@ Example: a `fromViemWalletClient` signer (typed-data only) passed to the
 multi-op Merkle path (which needs `signHash`) fails before the wallet is
 ever invoked.
 
-## Not covered here
+## Account-specific flows
 
-- Account-specific flows: see `../sponsor-gas/sponsor-gas-external-signer.ts`,
-  `../eip-7702/*/0X-external-signer*.ts`,
-  `../chain-abstraction/add-owner-with-external-signer.ts`.
-- The legacy sync API (`signUserOperation(op, [pk], chainId)`) is still
-  supported. Use it when you already have a raw pk string and don't need
-  async signing.
+- `../eip-7702/simple-account/05-external-signer.ts` - Simple7702 (EP v0.8)
+- `../eip-7702/simple-account/06-external-signer-v09.ts` - Simple7702 (EP v0.9, two-phase paymaster)
+- `../eip-7702/calibur-account/04-external-signer.ts` - Calibur
+- `../chain-abstraction/add-owner-with-external-signer.ts` - multi-chain, multi-op with one signature

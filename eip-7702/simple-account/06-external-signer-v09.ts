@@ -14,7 +14,7 @@
  * generic ERC-7677 standard. Every other new signer example in this PR
  * uses `Erc7677Paymaster`.
  *
- * Delegation authorization: same as 06-external-signer.ts. Signed via
+ * Delegation authorization: same as 05-external-signer.ts. Signed via
  * the callback overload of createAndSignEip7702DelegationAuthorization
  * using the viem LocalAccount's .sign, so no raw private key reaches
  * abstractionkit; separate from the UserOperation signature.
