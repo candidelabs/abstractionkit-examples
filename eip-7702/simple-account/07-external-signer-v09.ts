@@ -14,9 +14,10 @@
  * generic ERC-7677 standard. Every other new signer example in this PR
  * uses `Erc7677Paymaster`.
  *
- * Delegation authorization: same as 06-external-signer.ts. Signed with
- * the raw pk via createAndSignEip7702DelegationAuthorization; separate
- * from the UserOperation signature.
+ * Delegation authorization: same as 06-external-signer.ts. Signed via
+ * the callback overload of createAndSignEip7702DelegationAuthorization
+ * using the viem LocalAccount's .sign, so no raw private key reaches
+ * abstractionkit; separate from the UserOperation signature.
  */
 
 import {
@@ -35,8 +36,12 @@ async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
     const { publicAddress, privateKey } = getOrCreateOwner()
 
-    // 1. Build the ExternalSigner.
-    const signer = fromViem(privateKeyToAccount(privateKey as `0x${string}`))
+    // 1. Build the ExternalSigner. We keep a reference to the underlying
+    //    viem LocalAccount so we can reuse its .sign method below for the
+    //    7702 delegation authorization, without handing the raw private
+    //    key to abstractionkit.
+    const localAccount = privateKeyToAccount(privateKey as `0x${string}`)
+    const signer = fromViem(localAccount)
     console.log('EOA     :', publicAddress)
 
     // 2. Initialize the Simple7702 v0.9 account and the paymaster client.
@@ -58,14 +63,16 @@ async function main(): Promise<void> {
         { eip7702Auth: { chainId } },
     )
 
-    // 5. Sign the EIP-7702 delegation authorization (raw pk; NOT the
-    //    ExternalSigner path).
+    // 5. Sign the EIP-7702 delegation authorization via the external
+    //    signer callback. createAndSignEip7702DelegationAuthorization
+    //    accepts a callback (hash) => Promise<sig>; we delegate to the
+    //    viem LocalAccount so the key never enters abstractionkit.
     if (userOp.eip7702Auth) {
-        userOp.eip7702Auth = createAndSignEip7702DelegationAuthorization(
+        userOp.eip7702Auth = await createAndSignEip7702DelegationAuthorization(
             BigInt(userOp.eip7702Auth.chainId),
             userOp.eip7702Auth.address,
             BigInt(userOp.eip7702Auth.nonce),
-            privateKey,
+            async (hash) => localAccount.sign({ hash: hash as `0x${string}` }),
         )
     }
 
