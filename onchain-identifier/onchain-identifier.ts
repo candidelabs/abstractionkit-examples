@@ -112,4 +112,7 @@ async function main(): Promise<void> {
     )
 }
 
-main()
+main().catch((err: unknown) => {
+    console.error('FAILED:', err instanceof Error ? err.message : String(err))
+    process.exit(1)
+})

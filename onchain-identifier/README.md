@@ -33,7 +33,7 @@ retroactively tagged.
 
 ## Marker layout (32 bytes)
 
-```
+```text
 5afe │ 00 │ project(20) │ platform(3) │ tool(3) │ toolVersion(3)
 └─prefix  │
    version
