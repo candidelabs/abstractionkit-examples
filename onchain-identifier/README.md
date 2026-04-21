@@ -41,10 +41,6 @@ retroactively tagged.
 
 Each content field is `keccak256(value)` truncated to its byte width.
 
-> The Safe docs page currently says "50 bytes in length" — that's a docs bug.
-> The field widths sum to 32, the SDK produces 32, and the example tx they
-> link to carries 32. [Canonical docs page.](https://docs.safe.global/sdk/onchain-tracking)
-
 ## Indexer pattern
 
 ### Exact: decode `UserOperationEvent`
