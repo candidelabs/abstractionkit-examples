@@ -62,7 +62,7 @@ async function main(): Promise<void> {
 
     // Sponsor with paymaster
     const paymaster = new CandidePaymaster(paymasterUrl)
-    let [paymasterUserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: paymasterUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId)
     userOperation = paymasterUserOperation;
 

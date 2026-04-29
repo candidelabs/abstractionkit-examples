@@ -56,12 +56,13 @@ async function main(): Promise<void> {
     // ──────────────────────────────────────────────────────────────────────
     console.log("Paymaster commit: estimating gas...")
 
-    let [commitOp] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: commitOp } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount,
         userOperation,
         bundlerUrl,
         sponsorshipPolicyId,
-        { entrypoint: smartAccount.entrypointAddress, context: { signingPhase: "commit" as const } },
+        { signingPhase: "commit" },
+        { entrypoint: smartAccount.entrypointAddress },
     )
     userOperation = commitOp
 
@@ -77,12 +78,13 @@ async function main(): Promise<void> {
     // ──────────────────────────────────────────────────────────────────────
     console.log("Paymaster finalize: getting final paymasterData...")
 
-    let [finalizedOp] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: finalizedOp } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount,
         userOperation,
         bundlerUrl,
         sponsorshipPolicyId,
-        { entrypoint: smartAccount.entrypointAddress, context: { signingPhase: "finalize" as const } },
+        { signingPhase: "finalize" },
+        { entrypoint: smartAccount.entrypointAddress },
     )
     userOperation = finalizedOp
 

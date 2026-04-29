@@ -79,17 +79,18 @@ async function main(): Promise<void> {
     console.log("Visit our Discord to get some CTT token for testing");
 
     if (tokenSelected) {
-        userOperation = await paymaster.createTokenPaymasterUserOperation(
+        // v0.3.3+: createTokenPaymasterUserOperation returns the maximum
+        // token cost (`tokenQuote.tokenCost`) and exchange rate alongside
+        // the UserOperation, so a separate `calculateUserOperationErc20TokenMaxGasCost`
+        // round-trip is no longer needed for cost display.
+        const { userOperation: tokenOp, tokenQuote } = await paymaster.createTokenPaymasterUserOperation(
             smartAccount,
             userOperation,
             tokenSelected.address,
             bundlerUrl,
         )
-        const cost = await paymaster.calculateUserOperationErc20TokenMaxGasCost(
-            smartAccount,
-            userOperation,
-            tokenSelected.address,
-        )
+        userOperation = tokenOp
+        const cost = tokenQuote?.tokenCost ?? 0n
         console.log("This useroperation may cost upto : " + cost + " wei in CTT token")
         console.log(
             "Please fund the sender account : " +

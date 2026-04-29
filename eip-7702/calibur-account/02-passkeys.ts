@@ -133,7 +133,7 @@ async function main(): Promise<void> {
         )
     }
 
-    let [sponsoredRegisterOp] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: sponsoredRegisterOp } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount, registerOp, bundlerUrl, sponsorshipPolicyId,
     )
     registerOp = sponsoredRegisterOp
@@ -197,7 +197,7 @@ async function main(): Promise<void> {
     )
 
     // Sponsor gas before signing (EP v0.8 includes paymaster data in hash)
-    let [sponsoredUserOperation] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: sponsoredUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId,
     )
     userOperation = sponsoredUserOperation

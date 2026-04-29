@@ -73,7 +73,7 @@ async function main(): Promise<void> {
 
     const paymaster = new CandidePaymaster(paymasterUrl);
 
-    let [sponsoredSetAllowanceUserOp, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: sponsoredSetAllowanceUserOp } = await paymaster.createSponsorPaymasterUserOperation(
         sourceSafeAccount, setAllowanceUserOp, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     setAllowanceUserOp = sponsoredSetAllowanceUserOp;
 
@@ -115,7 +115,7 @@ async function main(): Promise<void> {
 
     let allowanceTransferUserOp = await delegateSafeAccount.createUserOperation([allowanceTransferMetaTransaction], nodeUrl, bundlerUrl);
 
-    let [sponsoredAllowanceTransferUserOp, _sponsorMetaData2] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: sponsoredAllowanceTransferUserOp } = await paymaster.createSponsorPaymasterUserOperation(
         delegateSafeAccount, allowanceTransferUserOp, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     allowanceTransferUserOp = sponsoredAllowanceTransferUserOp;
 

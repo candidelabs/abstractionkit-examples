@@ -75,9 +75,10 @@ async function main(): Promise<void> {
 
     // ─── 3. Sponsor, sign, send ───────────────────────────────────────────
     const paymaster = new CandidePaymaster(paymasterUrl)
-    ;[userOp] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: sponsoredOp } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount, userOp, bundlerUrl, sponsorshipPolicyId,
     )
+    userOp = sponsoredOp
     userOp.signature = smartAccount.signUserOperation(userOp, [ownerKey], chainId)
 
     console.log('Sending userOp ...')
