@@ -77,9 +77,9 @@ async function main(): Promise<void> {
     }
 
     // 6. Paymaster COMMIT: stub data + gas estimation.
-    let [commitOp] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: commitOp } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount, userOp, bundlerUrl, sponsorshipPolicyId,
-        { context: { signingPhase: 'commit' as const } },
+        { signingPhase: 'commit' },
     )
     userOp = commitOp
 
@@ -90,9 +90,9 @@ async function main(): Promise<void> {
     )
 
     // 8. Paymaster FINALIZE: paymaster signature now covers the signed op.
-    let [finalizedOp] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: finalizedOp } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount, userOp, bundlerUrl, sponsorshipPolicyId,
-        { context: { signingPhase: 'finalize' as const } },
+        { signingPhase: 'finalize' },
     )
     userOp = finalizedOp
 

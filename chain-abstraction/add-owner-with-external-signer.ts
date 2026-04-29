@@ -21,6 +21,7 @@
 
 import {
     CandidePaymaster,
+    type CandidePaymasterContext,
     SafeMultiChainSigAccountV1 as SafeAccount,
     fromViem,
 } from 'abstractionkit'
@@ -57,8 +58,8 @@ async function main(): Promise<void> {
 
     const paymaster1 = new CandidePaymaster(paymasterUrl1)
     const paymaster2 = new CandidePaymaster(paymasterUrl2)
-    const commit = { context: { signingPhase: 'commit' as const } }
-    const finalize = { context: { signingPhase: 'finalize' as const } }
+    const commit: CandidePaymasterContext = { signingPhase: 'commit' }
+    const finalize: CandidePaymasterContext = { signingPhase: 'finalize' }
 
     // 4. Assemble a UserOperation on each chain.
     let [op1, op2] = await Promise.all([
@@ -75,7 +76,7 @@ async function main(): Promise<void> {
             smartAccount, op2, bundlerUrl2, sponsorshipPolicyId2, commit,
         ),
     ])
-    ;[op1, op2] = [committed[0][0], committed[1][0]]
+    ;[op1, op2] = [committed[0].userOperation, committed[1].userOperation]
 
     // 6. ONE signing call, N signatures out.
     const signatures = await smartAccount.signUserOperationsWithSigners(
@@ -98,7 +99,7 @@ async function main(): Promise<void> {
             smartAccount, op2, bundlerUrl2, sponsorshipPolicyId2, finalize,
         ),
     ])
-    ;[op1, op2] = [finalized[0][0], finalized[1][0]]
+    ;[op1, op2] = [finalized[0].userOperation, finalized[1].userOperation]
 
     // 8. Submit to each bundler concurrently and wait for inclusion.
     const [resp1, resp2] = await Promise.all([

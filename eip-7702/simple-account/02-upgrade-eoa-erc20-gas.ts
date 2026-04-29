@@ -75,18 +75,18 @@ async function main(): Promise<void> {
         return
     }
 
-    userOperation = await paymaster.createTokenPaymasterUserOperation(
+    // v0.3.3+: createTokenPaymasterUserOperation returns the maximum
+    // token cost (`tokenQuote.tokenCost`) and exchange rate alongside
+    // the UserOperation, so a separate `calculateUserOperationErc20TokenMaxGasCost`
+    // round-trip is no longer needed for cost display.
+    const { userOperation: tokenOp, tokenQuote } = await paymaster.createTokenPaymasterUserOperation(
         smartAccount,
         userOperation,
         tokenSelected.address,
         bundlerUrl,
     )
-
-    const cost = await paymaster.calculateUserOperationErc20TokenMaxGasCost(
-        smartAccount,
-        userOperation,
-        tokenSelected.address,
-    )
+    userOperation = tokenOp
+    const cost = tokenQuote?.tokenCost ?? 0n
     console.log("Estimated gas cost: " + cost + " wei in " + tokenSelected.symbol)
     console.log("Sender account: " + userOperation.sender)
 

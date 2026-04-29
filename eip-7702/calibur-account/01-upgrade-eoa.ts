@@ -117,7 +117,7 @@ async function main(): Promise<void> {
     // ──────────────────────────────────────────────────────────────────────
     // In EP v0.8, paymaster data is included in the UserOperation hash,
     // so it must be set before signing.
-    let [sponsoredUserOperation] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: sponsoredUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId,
     )
     userOperation = sponsoredUserOperation

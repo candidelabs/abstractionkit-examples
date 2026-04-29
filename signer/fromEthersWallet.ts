@@ -49,10 +49,11 @@ async function main(): Promise<void> {
 
     // 5. Sponsor gas via an ERC-7677 paymaster (provider-agnostic).
     const paymaster = new Erc7677Paymaster(paymasterUrl)
-    userOp = await paymaster.createPaymasterUserOperation(
+    const { userOperation: sponsoredOp } = await paymaster.createPaymasterUserOperation(
         smartAccount, userOp, bundlerUrl,
         sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
+    userOp = sponsoredOp
 
     // 6. Sign with the ExternalSigner.
     userOp.signature = await smartAccount.signUserOperationWithSigners(

@@ -54,12 +54,13 @@ async function main(): Promise<void> {
     const context = sponsorshipPolicyId
         ? { sponsorshipPolicyId, policyId: sponsorshipPolicyId }
         : {}
-    userOperation = await paymaster.createPaymasterUserOperation(
+    const { userOperation: sponsoredOp } = await paymaster.createPaymasterUserOperation(
         smartAccount,
         userOperation,
         bundlerUrl,
         context,
     )
+    userOperation = sponsoredOp
 
     const cost = calculateUserOperationMaxGasCost(userOperation)
     console.log("This UserOperation may cost up to:", cost, "wei (sponsored by the paymaster)")

@@ -15,7 +15,6 @@
  * In a real browser application, use the native navigator.credentials API.
  */
 
-import * as dotenv from 'dotenv'
 import { hexToBytes, keccak256, toBytes, numberToBytes } from 'viem'
 import {
   SafeAccountV0_3_0 as SafeAccount,
@@ -28,6 +27,7 @@ import {
   SignerSignaturePair,
 } from "abstractionkit";
 
+import { loadEnv } from '../utils/env'
 import {
   UserVerificationRequirement,
   WebAuthnCredentials,
@@ -56,22 +56,7 @@ const eip7212WebAuthnContractVerifier = "0xA86e0054C51E4894D88762a017ECc5E5235f5
 const webAuthnSignerProxyCreationCode = "0x610100346100ad57601f6101b538819003918201601f19168301916001600160401b038311848410176100b2578084926080946040528339810103126100ad578051906001600160a01b03821682036100ad5760208101516040820151606090920151926001600160b01b03841684036100ad5760805260a05260c05260e05260405160ec90816100c98239608051816082015260a05181604d015260c051816027015260e0518160010152f35b600080fd5b634e487b7160e01b600052604160045260246000fdfe7f000000000000000000000000000000000000000000000000000000000000000060b63601527f000000000000000000000000000000000000000000000000000000000000000060a03601527f000000000000000000000000000000000000000000000000000000000000000036608001523660006080376000806056360160807f00000000000000000000000000000000000000000000000000000000000000005af43d600060803e60b1573d6080fd5b3d6080f3fea26469706673582212201660515548d15702d720bbc046b457ca85e941a4559ab9f9518488e4c82e5ee964736f6c634300081a0033"
 
 async function main(): Promise<void> {
-  // Load environment variables
-  dotenv.config()
-
-  // Validate required environment variables
-  const requiredEnvVars = ['CHAIN_ID', 'BUNDLER_URL', 'NODE_URL', 'PAYMASTER_URL'];
-  for (const varName of requiredEnvVars) {
-    if (!process.env[varName]) {
-      throw new Error(`Missing required environment variable: ${varName}`);
-    }
-  }
-
-  const chainId = BigInt(process.env.CHAIN_ID as string)
-  const bundlerUrl = process.env.BUNDLER_URL as string
-  const nodeUrl = process.env.NODE_URL as string
-  const paymasterUrl = process.env.PAYMASTER_URL as string;
-  const sponsorshipPolicyId = process.env.SPONSORSHIP_POLICY_ID as string;
+  const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
 
   // Simulated WebAuthn navigator for demonstration
   // In a real browser, you would use: window.navigator.credentials
@@ -166,7 +151,7 @@ async function main(): Promise<void> {
 
     // Request paymaster sponsorship
     let paymaster: CandidePaymaster = new CandidePaymaster(paymasterUrl)
-    let [paymasterUserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: paymasterUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
       smartAccount,
       userOperation,
       bundlerUrl,

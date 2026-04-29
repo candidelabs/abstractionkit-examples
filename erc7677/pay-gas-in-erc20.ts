@@ -53,12 +53,17 @@ async function main(): Promise<void> {
 
     // 4. Pay gas in ERC-20 via the ERC-7677 paymaster.
     const paymaster = new Erc7677Paymaster(paymasterUrl)
-    userOperation = await paymaster.createPaymasterUserOperation(
+    const { userOperation: tokenOp, tokenQuote } = await paymaster.createPaymasterUserOperation(
         smartAccount,
         userOperation,
         bundlerUrl,
         { token: tokenAddress },
     )
+    userOperation = tokenOp
+
+    if (tokenQuote) {
+        console.log("Max token cost:", tokenQuote.tokenCost, "(exchange rate:", tokenQuote.exchangeRate, ")")
+    }
 
     // 5. Sign and send.
     userOperation.signature = smartAccount.signUserOperation(

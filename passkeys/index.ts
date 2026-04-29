@@ -119,7 +119,7 @@ async function main(): Promise<void> {
 
     // Request paymaster sponsorship
     let paymaster: CandidePaymaster = new CandidePaymaster(paymasterUrl)
-    let [paymasterUserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: paymasterUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
       smartAccount,
       userOperation,
       bundlerUrl,

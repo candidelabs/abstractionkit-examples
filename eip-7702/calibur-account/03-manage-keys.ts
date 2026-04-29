@@ -97,7 +97,7 @@ async function main(): Promise<void> {
     let registerOp = await smartAccount.createUserOperation(
         registerTxs, nodeUrl, bundlerUrl,
     )
-    let [sponsoredRegisterOp] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: sponsoredRegisterOp } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount, registerOp, bundlerUrl, sponsorshipPolicyId,
     )
     registerOp = sponsoredRegisterOp
@@ -142,7 +142,7 @@ async function main(): Promise<void> {
         [{ to: nftContractAddress, value: 0n, data: mintCallData }],
         nodeUrl, bundlerUrl,
     )
-    let [sponsoredSecondaryOp] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: sponsoredSecondaryOp } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount, secondaryOp, bundlerUrl, sponsorshipPolicyId,
     )
     secondaryOp = sponsoredSecondaryOp
@@ -181,7 +181,7 @@ async function main(): Promise<void> {
     let updateOp = await smartAccount.createUserOperation(
         [updateTx], nodeUrl, bundlerUrl,
     )
-    let [sponsoredUpdateOp] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: sponsoredUpdateOp } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount, updateOp, bundlerUrl, sponsorshipPolicyId,
     )
     updateOp = sponsoredUpdateOp
@@ -215,7 +215,7 @@ async function main(): Promise<void> {
     let revokeOp = await smartAccount.createUserOperation(
         [revokeTx], nodeUrl, bundlerUrl,
     )
-    let [sponsoredRevokeOp] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: sponsoredRevokeOp } = await paymaster.createSponsorPaymasterUserOperation(
         smartAccount, revokeOp, bundlerUrl, sponsorshipPolicyId,
     )
     revokeOp = sponsoredRevokeOp

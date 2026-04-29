@@ -58,7 +58,7 @@ async function main(): Promise<void> {
     )
     const paymaster = new CandidePaymaster(paymasterUrl);
 
-    const [paymasterSubAccount1UserOperation, _sponsorMetadata] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: paymasterSubAccount1UserOperation } = await paymaster.createSponsorPaymasterUserOperation(
         subAccount1, subAccount1DeployMainAccountUserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     subAccount1DeployMainAccountUserOperation = paymasterSubAccount1UserOperation;
 
@@ -137,7 +137,7 @@ async function main(): Promise<void> {
         }
     )
 
-    let [paymasterUserOperation1, _sponsorMetadata1] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: paymasterUserOperation1 } = await paymaster.createSponsorPaymasterUserOperation(
         mainAccount, mainAccountUserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     mainAccountUserOperation = paymasterUserOperation1;
 
@@ -168,7 +168,7 @@ async function main(): Promise<void> {
         nodeUrl,
         bundlerUrl,
     )
-    const [paymasterSubAccount1UserOperation11, _sponsorMetadata11] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: paymasterSubAccount1UserOperation11 } = await paymaster.createSponsorPaymasterUserOperation(
         subAccount1, subAccount1UserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     subAccount1UserOperation = paymasterSubAccount1UserOperation11;
 
@@ -182,7 +182,7 @@ async function main(): Promise<void> {
         nodeUrl,
         bundlerUrl,
     )
-    const [paymasterSubAccount2UserOperation, _sponsorMetadata2] = await paymaster.createSponsorPaymasterUserOperation(
+    const { userOperation: paymasterSubAccount2UserOperation } = await paymaster.createSponsorPaymasterUserOperation(
         subAccount2, subAccount2UserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
     subAccount2UserOperation = paymasterSubAccount2UserOperation;
 
