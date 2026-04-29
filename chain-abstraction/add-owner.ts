@@ -18,6 +18,7 @@ import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     CandidePaymaster,
+    type CandidePaymasterContext,
     UserOperationV9,
 } from "abstractionkit";
 
@@ -68,13 +69,13 @@ async function main(): Promise<void> {
 
     console.log("[2/5] Paymaster commit on both chains...")
 
-    const commitOverrides = { context: { signingPhase: "commit" as const } };
-    const [[commitOp1], [commitOp2]] = await Promise.all([
+    const commitContext: CandidePaymasterContext = { signingPhase: "commit" };
+    const [{ userOperation: commitOp1 }, { userOperation: commitOp2 }] = await Promise.all([
         paymaster1.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation1, bundlerUrl1, sponsorshipPolicyId1, commitOverrides,
+            smartAccount, userOperation1, bundlerUrl1, sponsorshipPolicyId1, commitContext,
         ),
         paymaster2.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation2, bundlerUrl2, sponsorshipPolicyId2, commitOverrides,
+            smartAccount, userOperation2, bundlerUrl2, sponsorshipPolicyId2, commitContext,
         ),
     ])
     userOperation1 = commitOp1
@@ -96,13 +97,13 @@ async function main(): Promise<void> {
 
     console.log("[4/5] Paymaster finalize on both chains...")
 
-    const finalizeOverrides = { context: { signingPhase: "finalize" as const } };
-    const [[finalOp1], [finalOp2]] = await Promise.all([
+    const finalizeContext: CandidePaymasterContext = { signingPhase: "finalize" };
+    const [{ userOperation: finalOp1 }, { userOperation: finalOp2 }] = await Promise.all([
         paymaster1.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation1, bundlerUrl1, sponsorshipPolicyId1, finalizeOverrides,
+            smartAccount, userOperation1, bundlerUrl1, sponsorshipPolicyId1, finalizeContext,
         ),
         paymaster2.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation2, bundlerUrl2, sponsorshipPolicyId2, finalizeOverrides,
+            smartAccount, userOperation2, bundlerUrl2, sponsorshipPolicyId2, finalizeContext,
         ),
     ])
     userOperation1 = finalOp1
