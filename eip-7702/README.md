@@ -12,7 +12,8 @@ eip-7702/
 │   ├── 03-upgrade-eoa-ep-v09.ts     # Upgrade EOA using EntryPoint v0.9
 │   ├── 04-revoke-delegation.ts      # Revoke EIP-7702 delegation
 │   ├── 05-external-signer.ts        # Upgrade EOA with the v0.3.2 ExternalSigner API
-│   └── 06-external-signer-v09.ts    # Same, EntryPoint v0.9 (two-phase paymaster)
+│   ├── 06-external-signer-v09.ts    # Same, EntryPoint v0.9 (two-phase paymaster)
+│   └── 07-typed-data-builder.ts     # Drive signTypedData yourself via getUserOperationEip712TypedData
 └── calibur-account/      # Calibur7702Account examples (passkeys, key management)
     ├── 01-upgrade-eoa.ts
     ├── 02-passkeys.ts
