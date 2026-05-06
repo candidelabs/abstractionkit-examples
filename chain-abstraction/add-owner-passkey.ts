@@ -1,60 +1,72 @@
 /**
- * Add Owner Across Chains - Passkey (WebAuthn) Signed Version
+ * Add a new owner to a Safe Unified Account on TWO chains with a SINGLE
+ * passkey signature.
  *
- * This example demonstrates signing with a passkey (WebAuthn) for multi-chain
- * operations using Safe Unified Account.
+ * Account class : SafeMultiChainSigAccountV1
+ * Signing method: signUserOperationsWithSigners(opsToSign, signers)
+ * Signer adapter: fromSafeWebauthn({ accountClass: SafeMultiChainSigAccountV1 })
+ * Paymaster     : CandidePaymaster on each chain (two-phase)
  *
- * Use Case: Secure, phishing-resistant authentication using device biometrics
- * (Face ID, Touch ID, Windows Hello) for cross-chain account management.
+ * What this demonstrates:
+ *  - One WebAuthn assertion → both UserOps validate on-chain.
+ *  - The adapter sources Safe Passkeys v0.2.1 defaults (Daimo P256 verifier,
+ *    RIP-7951 precompile) automatically because we pass
+ *    `accountClass: SafeMultiChainSigAccountV1`. Without that param the
+ *    derived signer address would not match the on-chain owner and the
+ *    bundler would reject with "Invalid UserOp signature" (GS026).
  *
- * Key difference from add-owner.ts:
- * - Uses getMultiChainSingleSignatureUserOperationsEip712Hash() to get the hash to sign
- * - Signs with WebAuthn credential (passkey)
- * - Uses formatSignaturesToUseroperationsSignatures() to format the result
+ * Assumes the Safe is fresh on both chains (both UserOps are isInit=true).
+ * For mixed init states (deployed on one chain, fresh on the other),
+ * you'd build two adapters with different `isInit` values and split the
+ * ops between them.
  *
- * Learn more: https://docs.candide.dev/account-abstraction/research/safe-unified-account
+ * Use case: one-tap cross-chain account management secured by a device
+ * passkey (Touch ID / Face ID / Windows Hello).
  */
 
-import { loadMultiChainEnv } from '../utils/env'
-import { hexToBytes, keccak256, toBytes, numberToBytes } from 'viem'
-import { generatePrivateKey, privateKeyToAccount } from "viem/accounts"
 import {
-    SafeMultiChainSigAccountV1 as SafeAccount,
+    AbstractionKitError,
     CandidePaymaster,
+    SafeMultiChainSigAccountV1,
+    fromSafeWebauthn,
+    pubkeyCoordinatesFromJson,
+    pubkeyCoordinatesToJson,
+    webauthnSignatureFromAssertion,
     type CandidePaymasterContext,
-    WebauthnPublicKey,
-    WebauthnSignatureData,
-    SignerSignaturePair,
-    UserOperationV9,
-} from "abstractionkit";
+    type UserOperationV9,
+    type WebauthnPublicKey,
+} from 'abstractionkit'
+import { hexToBytes, keccak256, numberToBytes, toBytes } from 'viem'
+import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 
+import { loadMultiChainEnv } from '../utils/env'
 import {
     UserVerificationRequirement,
     WebAuthnCredentials,
-    extractClientDataFields,
     extractPublicKey,
-    extractSignature
-} from '../passkeys/webauthn';
+} from '../passkeys/webauthn'
 
 async function main(): Promise<void> {
-    const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2, paymasterUrl1, paymasterUrl2, sponsorshipPolicyId1, sponsorshipPolicyId2 } = loadMultiChainEnv()
+    const {
+        chainId1, chainId2,
+        bundlerUrl1, bundlerUrl2,
+        nodeUrl1, nodeUrl2,
+        paymasterUrl1, paymasterUrl2,
+        sponsorshipPolicyId1, sponsorshipPolicyId2,
+    } = loadMultiChainEnv()
 
-    console.log("=".repeat(60))
-    console.log("ADD OWNER - PASSKEY (WEBAUTHN) SIGNED DEMO")
-    console.log("=".repeat(60))
+    console.log('='.repeat(60))
+    console.log('ADD OWNER ACROSS CHAINS — SIGNED BY ONE PASSKEY')
+    console.log('='.repeat(60))
 
-    console.log("\n[1/8] Creating WebAuthn credential (passkey)...")
-
-    const navigator = {
-        credentials: new WebAuthnCredentials(),
-    }
-
-    const credential = navigator.credentials.create({
+    // 1. Create a passkey credential. The simulator from `webauthn.ts`
+    //    keeps this runnable in node; in a browser, replace `navigator`
+    //    with `window.navigator` (and await the async create/get calls).
+    console.log('\n[1/7] Creating passkey...')
+    const navigator = { credentials: new WebAuthnCredentials() }
+    const credential = await navigator.credentials.create({
         publicKey: {
-            rp: {
-                name: 'Safe',
-                id: 'safe.global',
-            },
+            rp: { name: 'Candide', id: 'candide.dev' },
             user: {
                 id: hexToBytes(keccak256(toBytes('chain-abstraction-demo'))),
                 name: 'demo-user',
@@ -65,190 +77,143 @@ async function main(): Promise<void> {
         },
     })
 
-    const publicKey = extractPublicKey(credential.response)
-    const webauthPublicKey: WebauthnPublicKey = {
-        x: publicKey.x,
-        y: publicKey.y,
-    }
+    // Round-trip the pubkey through JSON — mirrors what a real app does
+    // when persisting + rehydrating, and exercises the typeof-bigint guard
+    // in fromSafeWebauthn (use pubkeyCoordinatesFromJson to hydrate).
+    const persisted = pubkeyCoordinatesToJson(extractPublicKey(credential.response))
+    const publicKey: WebauthnPublicKey = pubkeyCoordinatesFromJson(persisted)
 
-    console.log("  Passkey created!")
-    console.log("  Public key X:", publicKey.x.toString().slice(0, 20) + "...")
+    // 2. Initialize the multichain Safe with this passkey as owner. The
+    //    same address deploys on both chains.
+    const smartAccount = SafeMultiChainSigAccountV1.initializeNewAccount([publicKey])
+    console.log(`[2/7] Safe (same on both chains): ${smartAccount.accountAddress}`)
 
     const newOwnerAddress = privateKeyToAccount(generatePrivateKey()).address
+    console.log(`      New owner to add: ${newOwnerAddress}`)
+    console.log(`      Chains: ${chainId1} + ${chainId2}`)
 
-    console.log("\nPasskey owner (signer):", credential.id.slice(0, 20) + "...")
-    console.log("New owner to add:", newOwnerAddress)
-
-    // Initialize Safe Unified Account with passkey as owner
-    const smartAccount = SafeAccount.initializeNewAccount([webauthPublicKey])
-
-    console.log("\nSafe Account (same on both chains):", smartAccount.accountAddress)
-    console.log("\nTarget chains:")
-    console.log("  - Chain 1:", chainId1.toString())
-    console.log("  - Chain 2:", chainId2.toString())
-
-    // Create add owner transaction
+    // 3. Build the add-owner MetaTransaction (same calldata on both chains).
     const addOwnerTx = smartAccount.createStandardAddOwnerWithThresholdMetaTransaction(
-        newOwnerAddress, 1
-    );
+        newOwnerAddress, 1,
+    )
 
-    // Set up CandidePaymaster for gas sponsorship on both chains
+    // 4. Build both UserOps in parallel, then run the paymaster COMMIT
+    //    phase on each chain. After commit each op's userOpHash is
+    //    committed to its final shape (gas + paymaster fields).
+    console.log('[3/7] Building UserOperations...')
     const paymaster1 = new CandidePaymaster(paymasterUrl1)
     const paymaster2 = new CandidePaymaster(paymasterUrl2)
+    const expectedSigners = [publicKey] // gas estimator uses WebAuthn dummy sig
 
-    console.log("\n[2/8] Creating UserOperations for both chains...")
-
-    // expectedSigners tells the bundler gas estimator to build a realistic
-    // WebAuthn dummy signature using this passkey's pubkey coordinates.
-    // Without it, estimation under-counts verification gas for passkey signers.
-    const createOpOverrides = { expectedSigners: [webauthPublicKey] };
-
-    let [userOperation1, userOperation2] = await Promise.all([
-        smartAccount.createUserOperation(
-            [addOwnerTx], nodeUrl1, bundlerUrl1, createOpOverrides,
-        ),
-        smartAccount.createUserOperation(
-            [addOwnerTx], nodeUrl2, bundlerUrl2, createOpOverrides,
-        ),
-    ]);
-
-    console.log("[3/8] Paymaster commit on both chains...")
-
-    const commitContext: CandidePaymasterContext = { signingPhase: "commit" };
-    const [{ userOperation: commitOp1 }, { userOperation: commitOp2 }] = await Promise.all([
-        paymaster1.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation1, bundlerUrl1, sponsorshipPolicyId1, commitContext,
-        ),
-        paymaster2.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation2, bundlerUrl2, sponsorshipPolicyId2, commitContext,
-        ),
+    let [userOp1, userOp2] = await Promise.all([
+        smartAccount.createUserOperation([addOwnerTx], nodeUrl1, bundlerUrl1, { expectedSigners }),
+        smartAccount.createUserOperation([addOwnerTx], nodeUrl2, bundlerUrl2, { expectedSigners }),
     ])
-    userOperation1 = commitOp1
-    userOperation2 = commitOp2
 
-    const userOperationsToSign = [
-        {
-            userOperation: userOperation1,
-            chainId: chainId1,
-            overrides: { isInit: userOperation1.nonce == 0n },
-        },
-        {
-            userOperation: userOperation2,
-            chainId: chainId2,
-            overrides: { isInit: userOperation2.nonce == 0n },
-        },
-    ];
+    console.log('[4/7] Paymaster commit on both chains...')
+    const commit: CandidePaymasterContext = { signingPhase: 'commit' }
+    const [{ userOperation: c1 }, { userOperation: c2 }] = await Promise.all([
+        paymaster1.createSponsorPaymasterUserOperation(smartAccount, userOp1, bundlerUrl1, sponsorshipPolicyId1, commit),
+        paymaster2.createSponsorPaymasterUserOperation(smartAccount, userOp2, bundlerUrl2, sponsorshipPolicyId2, commit),
+    ])
+    userOp1 = c1
+    userOp2 = c2
 
-    console.log("[4/8] Getting cross-chain EIP-712 hash for signing...")
-
-    const multiChainHash = SafeAccount.getMultiChainSingleSignatureUserOperationsEip712Hash(
-        userOperationsToSign
-    );
-
-    console.log("  Cross-chain hash:", multiChainHash.slice(0, 20) + "...")
-
-    console.log("[5/8] Signing with passkey (WebAuthn)...")
-
-    const assertion = navigator.credentials.get({
-        publicKey: {
-            challenge: hexToBytes(multiChainHash as `0x${string}`),
-            rpId: 'safe.global',
-            allowCredentials: [{ type: 'public-key', id: new Uint8Array(credential.rawId) }],
-            userVerification: UserVerificationRequirement.required,
+    // 5. Sign both UserOps with one passkey assertion. The method computes
+    //    the multi-op EIP-712 hash, hands it to the adapter as the WebAuthn
+    //    challenge, and splits the resulting signature into per-op
+    //    signatures. `accountClass` locks the adapter to the v0.2.1 module
+    //    addresses the on-chain owner is bound to — omit it and the bundler
+    //    rejects with "Invalid UserOp signature" (GS026 inside Safe).
+    console.log('[5/7] Signing both UserOps with one passkey assertion...')
+    const signer = fromSafeWebauthn({
+        publicKey,
+        isInit: userOp1.nonce === 0n,
+        accountClass: SafeMultiChainSigAccountV1,
+        getAssertion: async (challenge) => {
+            const assertion = await navigator.credentials.get({
+                publicKey: {
+                    challenge,
+                    rpId: 'candide.dev',
+                    allowCredentials: [
+                        { type: 'public-key', id: new Uint8Array(credential.rawId) },
+                    ],
+                    userVerification: UserVerificationRequirement.required,
+                },
+            })
+            return webauthnSignatureFromAssertion(assertion.response)
         },
     })
 
-    const webauthSignatureData: WebauthnSignatureData = {
-        authenticatorData: assertion.response.authenticatorData,
-        clientDataFields: extractClientDataFields(assertion.response),
-        rs: extractSignature(assertion.response),
-    }
+    const [sig1, sig2] = await smartAccount.signUserOperationsWithSigners(
+        [
+            { userOperation: userOp1, chainId: chainId1 },
+            { userOperation: userOp2, chainId: chainId2 },
+        ],
+        [signer],
+    )
+    userOp1.signature = sig1
+    userOp2.signature = sig2
 
-    const webauthSignature = SafeAccount.createWebAuthnSignature(webauthSignatureData)
-
-    console.log("  Passkey signature obtained!")
-
-    const signerSignaturePair: SignerSignaturePair = {
-        signer: webauthPublicKey,
-        signature: webauthSignature,
-    }
-
-    console.log("[6/8] Formatting signatures for both chains...")
-
-    const signatures = SafeAccount.formatSignaturesToUseroperationsSignatures(
-        userOperationsToSign,
-        [signerSignaturePair],
-    );
-
-    console.log("  Single passkey signature formatted into", signatures.length, "UserOperation signatures")
-
-    userOperation1.signature = signatures[0];
-    userOperation2.signature = signatures[1];
-
-    console.log("[7/8] Paymaster finalize on both chains...")
-
-    const finalizeContext: CandidePaymasterContext = { signingPhase: "finalize" };
-    const [{ userOperation: finalOp1 }, { userOperation: finalOp2 }] = await Promise.all([
-        paymaster1.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation1, bundlerUrl1, sponsorshipPolicyId1, finalizeContext,
-        ),
-        paymaster2.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation2, bundlerUrl2, sponsorshipPolicyId2, finalizeContext,
-        ),
+    // 6. Paymaster FINALIZE on both chains: paymaster signs over the
+    //    owner's signature.
+    console.log('[6/7] Paymaster finalize on both chains...')
+    const finalize: CandidePaymasterContext = { signingPhase: 'finalize' }
+    const [{ userOperation: f1 }, { userOperation: f2 }] = await Promise.all([
+        paymaster1.createSponsorPaymasterUserOperation(smartAccount, userOp1, bundlerUrl1, sponsorshipPolicyId1, finalize),
+        paymaster2.createSponsorPaymasterUserOperation(smartAccount, userOp2, bundlerUrl2, sponsorshipPolicyId2, finalize),
     ])
-    userOperation1 = finalOp1
-    userOperation2 = finalOp2
+    userOp1 = f1
+    userOp2 = f2
 
-    console.log("[8/8] Submitting to both chains...")
-
+    // 7. Submit and wait for inclusion on both chains in parallel.
+    console.log('[7/7] Submitting to both chains...')
     await Promise.all([
-        sendAndMonitorUserOperation(userOperation1, bundlerUrl1, "Chain 1"),
-        sendAndMonitorUserOperation(userOperation2, bundlerUrl2, "Chain 2"),
-    ]);
+        sendAndWait(userOp1, bundlerUrl1, 'Chain 1'),
+        sendAndWait(userOp2, bundlerUrl2, 'Chain 2'),
+    ])
 
-    // Verify owners on both chains
-    console.log("\nVerifying owners on both chains...")
-
+    // Verify owners on both chains.
     const [owners1, owners2] = await Promise.all([
         smartAccount.getOwners(nodeUrl1),
-        smartAccount.getOwners(nodeUrl2)
-    ]);
+        smartAccount.getOwners(nodeUrl2),
+    ])
+    const has1 = owners1.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
+    const has2 = owners2.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
 
-    console.log("\n" + "=".repeat(60))
-    console.log("VERIFICATION COMPLETE")
-    console.log("=".repeat(60))
-    console.log("\nOwners on Chain 1:", owners1)
-    console.log("Owners on Chain 2:", owners2)
-
-    const hasNewOwner1 = owners1.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
-    const hasNewOwner2 = owners2.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
-
-    if (hasNewOwner1 && hasNewOwner2) {
-        console.log("\nNew owner successfully added on BOTH chains!")
-        console.log("Signed with a single passkey authentication.")
-    }
-}
-
-async function sendAndMonitorUserOperation(
-    userOperation: UserOperationV9,
-    bundlerUrl: string,
-    chainName: string
-): Promise<void> {
-    const smartAccount = new SafeAccount(userOperation.sender);
-    const sendUserOperationResponse = await smartAccount.sendUserOperation(
-        userOperation, bundlerUrl,
-    )
-
-    console.log(`  [${chainName}] UserOperation sent. Waiting for inclusion...`)
-    const receipt = await sendUserOperationResponse.included()
-
-    if (receipt == null) {
-        console.log(`  [${chainName}] Receipt not found (timeout)`)
-    } else if (receipt.success) {
-        console.log(`  [${chainName}] Success! Tx: ${receipt.receipt.transactionHash}`)
+    console.log('\n' + '='.repeat(60))
+    console.log('Owners on Chain 1:', owners1)
+    console.log('Owners on Chain 2:', owners2)
+    if (has1 && has2) {
+        console.log('\nNew owner added on BOTH chains via a single passkey assertion.')
     } else {
-        console.log(`  [${chainName}] Execution failed`)
+        throw new Error(`Owner not found on one of the chains (chain1=${has1}, chain2=${has2})`)
     }
 }
 
-main().catch(console.error)
+async function sendAndWait(
+    userOp: UserOperationV9,
+    bundlerUrl: string,
+    label: string,
+): Promise<void> {
+    const account = new SafeMultiChainSigAccountV1(userOp.sender)
+    const response = await account.sendUserOperation(userOp, bundlerUrl)
+    console.log(`      [${label}] sent — waiting...`)
+    const receipt = await response.included()
+    if (!receipt) throw new Error(`[${label}] timeout waiting for inclusion`)
+    if (!receipt.success) {
+        throw new Error(`[${label}] reverted on-chain — tx ${receipt.receipt.transactionHash}`)
+    }
+    console.log(`      [${label}] ok — tx ${receipt.receipt.transactionHash}`)
+}
+
+main().catch((err: unknown) => {
+    if (err instanceof AbstractionKitError) {
+        console.error('FAILED :', err.code, '-', err.message)
+        if (err.context) console.error('Context:', err.context)
+        if (err.cause) console.error('Cause  :', err.cause)
+    } else {
+        console.error(err)
+    }
+    process.exit(1)
+})
