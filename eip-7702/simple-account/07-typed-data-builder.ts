@@ -1,11 +1,11 @@
 /**
- * Drive `signTypedData` yourself using `getUserOperationEip712TypedData` —
+ * Drive `signTypedData` yourself using `getUserOperationEip712Data` —
  * the lower-level path for integrators who already have a
  * `signTypedData(domain, types, message)` primitive and don't want to
  * wrap it in an ExternalSigner.
  *
  * Account class : Simple7702Account
- * Signing API   : account.getUserOperationEip712TypedData(op, chainId)
+ * Signing API   : Simple7702Account.getUserOperationEip712Data(op, chainId)
  *                 + your own signTypedData
  * Paymaster     : Erc7677Paymaster (sponsored)
  *
@@ -102,7 +102,7 @@ async function main(): Promise<void> {
     //    — ready for any signTypedData implementation. ethers v6 infers
     //    `EIP712Domain` automatically; viem / wallet RPCs accept the same
     //    structure as-is.
-    const typedData = smartAccount.getUserOperationEip712TypedData(userOp, chainId)
+    const typedData = Simple7702Account.getUserOperationEip712Data(userOp, chainId)
     userOp.signature = await wallet.signTypedData(
         typedData.domain,
         typedData.types,

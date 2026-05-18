@@ -4,12 +4,13 @@
  *
  * Account class : SafeMultiChainSigAccountV1 (EntryPoint v0.9)
  * Signing method: signUserOperationsWithSigners(items, [signer])
- * Signer adapter: fromViem
+ * Signer adapter: fromViemWalletClient
  * Paymaster     : CandidePaymaster (two-phase per chain: commit -> sign -> finalize)
  *
  * Key property: one call to signUserOperationsWithSigners produces one
- * signature per op from a single signing operation (Merkle root). The
- * user, HSM, or hardware wallet is prompted once for N chains.
+ * signature per op from a single EIP-712 signing operation over the
+ * Merkle root. Browser-wallet style signers that only expose
+ * `signTypedData` work on this multi-op path.
  *
  * Why CandidePaymaster here: EntryPoint v0.9 uses a two-phase paymaster
  * signing flow where the paymaster signature covers the owner signature.
@@ -23,8 +24,9 @@ import {
     CandidePaymaster,
     type CandidePaymasterContext,
     SafeMultiChainSigAccountV1 as SafeAccount,
-    fromViem,
+    fromViemWalletClient,
 } from 'abstractionkit'
+import { createWalletClient, http } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 
 import { getOrCreateOwner, loadMultiChainEnv } from '../utils/env'
@@ -39,11 +41,20 @@ async function main(): Promise<void> {
     } = loadMultiChainEnv()
     const { publicAddress, privateKey } = getOrCreateOwner()
 
-    // 1. Build the ExternalSigner and pick a new-owner address to add.
-    const signer = fromViem(privateKeyToAccount(privateKey as `0x${string}`))
+    // 1. Build a typed-data-only ExternalSigner and pick a new-owner
+    //    address to add. A real dApp would pass an injected/browser
+    //    WalletClient here; this local account keeps the example runnable
+    //    from Node while exercising the same `signTypedData`-only adapter.
+    const ownerAccount = privateKeyToAccount(privateKey as `0x${string}`)
+    const walletClient = createWalletClient({
+        account: ownerAccount,
+        transport: http(nodeUrl1),
+    })
+    const signer = fromViemWalletClient(walletClient)
     const newOwner = process.env.NEW_OWNER_ADDRESS
         ?? privateKeyToAccount(generatePrivateKey()).address
     console.log('Owner     :', publicAddress)
+    console.log('Signer    : signHash=false signTypedData=true')
     console.log('New owner :', newOwner)
     console.log('Chains    :', chainId1.toString(), '+', chainId2.toString())
 

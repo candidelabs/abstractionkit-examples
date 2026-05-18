@@ -29,9 +29,9 @@ import {
     Calibur7702Account,
     CandidePaymaster,
     createAndSignEip7702DelegationAuthorization,
-    getDelegatedAddress,
     getFunctionSelector,
     createCallData,
+    JsonRpcNode,
     WebAuthnSignatureData,
 } from "abstractionkit";
 
@@ -43,13 +43,14 @@ async function main(): Promise<void> {
 
     const smartAccount = new Calibur7702Account(publicAddress)
     const paymaster = new CandidePaymaster(paymasterUrl)
+    const node = JsonRpcNode.from(nodeUrl)
 
     // Check if the EOA is already delegated to the expected Calibur singleton.
     // isDelegated() returns true only if delegated to this account's delegateeAddress.
-    // getDelegatedAddress() returns the raw delegatee address for diagnostics.
+    // JsonRpcNode.getDelegatedAddress() returns the raw delegatee address for diagnostics.
     const alreadyDelegated = await smartAccount.isDelegatedToThisAccount(nodeUrl)
     if (!alreadyDelegated) {
-        const currentDelegatee = await getDelegatedAddress(publicAddress, nodeUrl);
+        const currentDelegatee = await node.getDelegatedAddress(publicAddress);
         if (currentDelegatee) {
             console.log("This EOA is delegated to a different singleton:", currentDelegatee)
             console.log("Expected:", smartAccount.delegateeAddress)

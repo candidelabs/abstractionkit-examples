@@ -41,6 +41,7 @@ async function main(): Promise<void> {
     // Initialize SafeMultiChainSigAccountV1 for deterministic address across chains
     const smartAccount = SafeAccount.initializeNewAccount(
         [ownerPublicAddress],
+        { c2Nonce: BigInt(Date.now()) },
     )
 
     console.log("\nSafe Account (same on both chains):", smartAccount.accountAddress)
@@ -169,4 +170,7 @@ async function sendAndMonitorUserOperation(
     }
 }
 
-main().catch(console.error)
+main().catch((err: unknown) => {
+    console.error(err)
+    process.exit(1)
+})

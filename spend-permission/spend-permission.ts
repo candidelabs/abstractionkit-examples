@@ -3,12 +3,12 @@ import {
     SafeAccountV0_3_0 as SafeAccount,
     AllowanceModule,
     CandidePaymaster,
-    ZeroAddress
 } from "abstractionkit";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createPublicClient, http, parseAbi } from "viem";
 
 const ERC20_ABI = parseAbi(["function balanceOf(address owner) view returns (uint256)"]);
+const allowanceTransferAmount = 1n;
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
@@ -35,8 +35,8 @@ async function main(): Promise<void> {
         args: [sourceSafeAccount.accountAddress as `0x${string}`],
     });
 
-    if (sourceSafeAccountBalance <= 2n) {
-        console.log("Please fund the Safe Account with some tokens first");
+    if (sourceSafeAccountBalance < allowanceTransferAmount) {
+        console.log(`Please fund the Safe Account with at least ${allowanceTransferAmount} token first`);
         console.log("Safe Account Address: " + sourceSafeAccount.accountAddress);
         console.log("Token: ", allowanceToken);
         console.log("Network Chain ID ", chainId.toString());
@@ -50,23 +50,34 @@ async function main(): Promise<void> {
 
     const allowanceModule = new AllowanceModule();
 
-    // Need to be enabled only once
-    const enableModuleMetaTransaction = allowanceModule.createEnableModuleMetaTransaction(sourceSafeAccount.accountAddress);
+    const setupTransactions = [];
+    const allowanceModuleEnabled = await sourceSafeAccount.isModuleEnabled(
+        nodeUrl,
+        allowanceModule.moduleAddress,
+    );
+
+    // Need to be enabled only once. Skipping this on reruns keeps the example idempotent.
+    if (!allowanceModuleEnabled) {
+        setupTransactions.push(
+            allowanceModule.createEnableModuleMetaTransaction(sourceSafeAccount.accountAddress)
+        );
+    }
 
     const addDelegateMetaTransaction = allowanceModule.createAddDelegateMetaTransaction(delegateSafeAccount.accountAddress);
+    setupTransactions.push(addDelegateMetaTransaction);
 
     const setAllowanceMetaTransaction =
         allowanceModule.createRecurringAllowanceMetaTransaction(
             delegateSafeAccount.accountAddress, // The address of the delegate to whom the recurring allowance is given.
             allowanceToken, // The address of the token for which the allowance is set. 
-            1n, // The amount of the token allowed for the delegate.
+            allowanceTransferAmount, // The amount of the token allowed for the delegate.
             3n, // The time period (in minutes) after which the allowance resets.
             0n, // The delay in minutes before the allowance can be used.
         );
 
     let setAllowanceUserOp =
         await sourceSafeAccount.createUserOperation(
-            [enableModuleMetaTransaction, addDelegateMetaTransaction, setAllowanceMetaTransaction],
+            [...setupTransactions, setAllowanceMetaTransaction],
             nodeUrl,
             bundlerUrl,
         );
@@ -103,13 +114,13 @@ async function main(): Promise<void> {
 
     /* The Delegate can now transfer the tokens on behaf of the Source Safe Account */
 
-    const transferRecipient = ZeroAddress;
+    const transferRecipient = delegateOwnerPublicAddress;
     const allowanceTransferMetaTransaction =
         allowanceModule.createAllowanceTransferMetaTransaction(
             sourceSafeAccount.accountAddress, // The safe address from which the allowance is being transferred
             allowanceToken,
             transferRecipient, // The recipient address of the allowance transfer.
-            2n, // The amount of tokens to be transferred.
+            allowanceTransferAmount, // The amount of tokens to be transferred.
             delegateSafeAccount.accountAddress, // The delegate address managing the transfer.
         );
 
@@ -145,4 +156,3 @@ async function main(): Promise<void> {
 }
 
 main();
-
