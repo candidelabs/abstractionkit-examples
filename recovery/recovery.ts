@@ -22,6 +22,7 @@ async function main(): Promise<void> {
     //the SafeAccount object for the following useroperations
     let smartAccount = SafeAccount.initializeNewAccount(
         [ownerPublicAddress],
+        { c2Nonce: BigInt(Date.now()) },
     )
 
     console.log("Account address(sender) : " + smartAccount.accountAddress)

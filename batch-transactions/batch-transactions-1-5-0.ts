@@ -1,21 +1,17 @@
-import * as dotenv from 'dotenv'
+import { loadEnv, getOrCreateOwner } from '../utils/env'
 
 import {
     SafeAccountV1_5_0_M_0_3_0,
     MetaTransaction,
     calculateUserOperationMaxGasCost,
+    CandidePaymaster,
     getFunctionSelector,
     createCallData,
 } from "abstractionkit";
 
-async function main(nonce:bigint): Promise<void> {
-    //get values from .env
-    dotenv.config()
-    const chainId = BigInt(process.env.CHAIN_ID as string)
-    const bundlerUrl = process.env.BUNDLER_URL as string
-    const nodeUrl = process.env.NODE_URL as string
-    const ownerPublicAddress = process.env.PUBLIC_ADDRESS as string
-    const ownerPrivateKey = process.env.PRIVATE_KEY as string
+async function main(nonce: bigint): Promise<void> {
+    const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
+    const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
 
     //initializeNewAccount only needed when the smart account
     //have not been deployed yet for its first useroperation.
@@ -72,11 +68,13 @@ async function main(nonce:bigint): Promise<void> {
     )
     const cost = calculateUserOperationMaxGasCost(userOperation)
     console.log("This useroperation may cost upto : " + cost + " wei")
-    console.log(
-        "Please fund the sender account : " +
-        userOperation.sender +
-        " with more than " + cost + " wei"
+
+    const paymaster = new CandidePaymaster(paymasterUrl)
+    const { userOperation: sponsoredUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
+        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId,
     )
+    userOperation = sponsoredUserOperation;
+    console.log("This example uses a Candide paymaster to sponsor the useroperation.")
 
     //Safe is a multisig that can have multiple owners/signers
     //signUserOperation will create a signature for the provided
@@ -111,7 +109,7 @@ async function main(nonce:bigint): Promise<void> {
     }
 }
 Promise.all([
-    main(0n),
+    main(BigInt(Date.now())),
     //main(1n),
     //main(2n)
 ])
