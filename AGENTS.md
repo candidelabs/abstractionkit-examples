@@ -63,6 +63,7 @@ npx ts-node <folder>/<script>.ts
 | EIP-7702 EP v0.9 | `eip-7702/simple-account/` | `03-upgrade-eoa-ep-v09.ts` |
 | EIP-7702 revoke delegation | `eip-7702/simple-account/` | `04-revoke-delegation.ts` |
 | EIP-7702 typed-data builder (drive signTypedData yourself) | `eip-7702/simple-account/` | `07-typed-data-builder.ts` |
+| EIP-7702 migrate v0.8 → v0.9 (sponsored, no revoke) | `eip-7702/simple-account/` | `08-migrate-v08-to-v09.ts` |
 | Debug with Tenderly | `simulate-with-tenderly/` | `simulate-with-tenderly.ts` |
 | Multichain-chain add owner | `chain-abstraction/` | `add-owner.ts` |
 | Multichain add guardian | `chain-abstraction/` | `add-guardian.ts` |
