@@ -2,8 +2,6 @@ import { loadEnv, getOrCreateOwner } from '../../utils/env'
 import {
     Simple7702Account,
     Simple7702AccountV09,
-    getFunctionSelector,
-    createCallData,
     createAndSignEip7702DelegationAuthorization,
     CandidePaymaster,
 } from "abstractionkit"
@@ -28,9 +26,8 @@ import {
 // This script is self-contained. It runs two phases:
 //   Phase 1 — delegate the EOA to v0.8        (sponsored, single-phase paymaster)
 //   Phase 2 — migrate the EOA to v0.9         (sponsored, commit/finalize paymaster)
-// Each phase mints an NFT to prove the account executes at that EntryPoint.
-
-const NFT_CONTRACT = "0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336"
+// Each phase's UserOperation carries a no-op call: the point is the EIP-7702
+// delegation it sets, not any on-chain action.
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
@@ -38,12 +35,9 @@ async function main(): Promise<void> {
 
     const paymaster = new CandidePaymaster(paymasterUrl)
 
-    // Shared demo action: mint one NFT to the EOA.
-    const mintNft = {
-        to: NFT_CONTRACT,
-        value: 0n,
-        data: createCallData(getFunctionSelector('mint(address)'), ["address"], [eoaAddress]),
-    }
+    // No-op self-call. Each UserOperation only needs to carry the EIP-7702
+    // delegation; this call does nothing on-chain.
+    const noOp = { to: eoaAddress, value: 0n, data: "0x" }
 
     // ═════════════════════════════════════════════════════════════════════════
     // Phase 1 — Delegate the EOA to the v0.8 implementation (sponsored)
@@ -52,7 +46,7 @@ async function main(): Promise<void> {
     console.log(`Phase 1: delegating EOA to v0.8 impl ${v08.delegateeAddress}`)
 
     let v08Op = await v08.createUserOperation(
-        [mintNft],
+        [noOp],
         nodeUrl,
         bundlerUrl,
         { eip7702Auth: { chainId } },
@@ -78,14 +72,12 @@ async function main(): Promise<void> {
 
     const v08Receipt = await (await v08.sendUserOperation(v08Op, bundlerUrl)).included()
     if (v08Receipt == null || !v08Receipt.success) {
-        console.log("Phase 1 failed — could not establish v0.8 delegation. Aborting.")
-        return
+        throw new Error("Phase 1 failed — could not establish v0.8 delegation.")
     }
     console.log(`Phase 1 included: ${v08Receipt.receipt.transactionHash}`)
 
     if (!(await v08.isDelegatedToThisAccount(nodeUrl))) {
-        console.log("EOA is not delegated to the v0.8 impl. Aborting migration.")
-        return
+        throw new Error("EOA is not delegated to the v0.8 impl after Phase 1.")
     }
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -95,7 +87,7 @@ async function main(): Promise<void> {
     console.log(`Phase 2: migrating EOA to v0.9 impl ${v09.delegateeAddress}`)
 
     let v09Op = await v09.createUserOperation(
-        [mintNft],
+        [noOp],
         nodeUrl,
         bundlerUrl,
         { eip7702Auth: { chainId } },
@@ -133,8 +125,7 @@ async function main(): Promise<void> {
 
     const v09Receipt = await (await v09.sendUserOperation(v09Op, bundlerUrl)).included()
     if (v09Receipt == null || !v09Receipt.success) {
-        console.log("Phase 2 failed — migration UserOperation was not included successfully.")
-        return
+        throw new Error("Phase 2 failed — migration UserOperation was not included successfully.")
     }
     console.log(`Phase 2 included: ${v09Receipt.receipt.transactionHash}`)
 
@@ -151,11 +142,13 @@ async function main(): Promise<void> {
     console.log(`  Delegated to v0.9 now:   ${onV09}`)
     console.log(`  Still delegated to v0.8: ${stillOnV08}`)
 
-    if (onV09 && !stillOnV08) {
-        console.log("Migration complete: EOA moved from EntryPoint v0.8 to v0.9, fully sponsored.")
-    } else {
-        console.log("Migration did not produce the expected delegation state.")
+    if (!onV09 || stillOnV08) {
+        throw new Error("Migration did not produce the expected delegation state.")
     }
+    console.log("Migration complete: EOA moved from EntryPoint v0.8 to v0.9, fully sponsored.")
 }
 
-main()
+main().catch((err) => {
+    console.error(err instanceof Error ? err.message : err)
+    process.exitCode = 1
+})
