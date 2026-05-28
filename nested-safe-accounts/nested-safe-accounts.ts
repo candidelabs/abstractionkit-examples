@@ -2,7 +2,7 @@ import { loadEnv } from '../utils/env'
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 
 import {
-    SafeAccountV0_3_0 as SafeAccount,
+    SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
     CandidePaymaster,
     getFunctionSelector,
@@ -142,11 +142,11 @@ async function main(): Promise<void> {
     mainAccountUserOperation = paymasterUserOperation1;
 
     mainAccountUserOperation.signature = SafeAccount.formatSignaturesToUseroperationSignature(
-        [subAccount1SignerSignaturePair, subAccount2SignerSignaturePair]
+        [subAccount1SignerSignaturePair, subAccount2SignerSignaturePair],
     )
     /***********************************/
     //create approveHash metaTransaction
-    const userOperationEip712Hash = SafeAccount.getUserOperationEip712Hash(
+    const userOperationEip712Hash = SafeAccount.getUserOperationEip712Hash_V9(
         mainAccountUserOperation,
         chainId,
     );

@@ -8,19 +8,27 @@
  * wallets (Ledger, Trezor), or any scenario where you don't have direct
  * access to the private key.
  *
- * Key difference from sponsor-gas.ts:
- * - Uses getUserOperationEip712Data() to get typed data for signing
- * - Signs with viem's walletClient.signTypedData()
- * - Uses formatEip712SingleSignatureToUseroperationSignature() to format the result
+ * Manual typed-data path (drive signTypedData yourself):
+ * - getUserOperationEip712Data() returns the { domain, types, messageValue }
+ *   to sign — useful when you want to inspect/log the structured payload, or
+ *   you already have a signTypedData(domain, types, message) primitive.
+ * - formatSignaturesToUseroperationSignature() turns the raw EIP-712
+ *   signature into the UserOperation signature. The Safe Unified Account
+ *   validates single ops through its multi-chain scheme, so pass
+ *   `isMultiChainSignature: true`.
+ *
+ * Prefer not to hand-roll this? Wrap the wallet with `fromViemWalletClient`
+ * and call `signUserOperationWithSigners` instead (see signer/).
  */
 
 import { loadEnv, getOrCreateOwner } from '../utils/env'
-import { createWalletClient, http } from 'viem'
+import { createWalletClient, http, type TypedDataDefinition } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import {
-    SafeAccountV0_3_0 as SafeAccount,
+    SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
     CandidePaymaster,
+    EIP712_SAFE_OPERATION_PRIMARY_TYPE,
     calculateUserOperationMaxGasCost,
     getFunctionSelector,
     createCallData,
@@ -69,35 +77,35 @@ async function main(): Promise<void> {
     const cost = calculateUserOperationMaxGasCost(userOperation)
     console.log("This useroperation may cost upto : " + cost + " wei")
 
-    // Get EIP-712 typed data for signing
+    // Get the EIP-712 typed data for this UserOperation. You can inspect or
+    // log this payload — it's exactly what the wallet popup will display.
     const eip712Data = SafeAccount.getUserOperationEip712Data(
         userOperation,
         chainId,
     )
 
-    console.log("EIP-712 domain:", JSON.stringify(eip712Data.domain, bigIntReplacer))
-
-    // Create a viem wallet client
-    // In a browser, this would be connected to MetaMask, WalletConnect, etc.
+    // Create a viem wallet client. In a browser, this is backed by the
+    // injected provider (MetaMask, WalletConnect, ...).
     const walletClient = createWalletClient({
         account: ownerAccount,
         transport: http(nodeUrl)
     });
 
-    // Sign the EIP-712 typed data
-    // In a browser, this would trigger a wallet popup showing the structured data
+    // Sign the EIP-712 typed data. In a browser this triggers a wallet popup
+    // showing the structured data.
     const signature = await walletClient.signTypedData({
-        domain: eip712Data.domain as Parameters<typeof walletClient.signTypedData>[0]['domain'],
+        domain: eip712Data.domain,
         types: eip712Data.types,
-        primaryType: 'SafeOp',
-        message: eip712Data.messageValue as unknown as Record<string, unknown>
-    });
+        primaryType: EIP712_SAFE_OPERATION_PRIMARY_TYPE,
+        message: eip712Data.messageValue,
+    } as unknown as TypedDataDefinition);
 
-    console.log("EIP-712 signature obtained:", signature.slice(0, 20) + "...")
-
-    // Format the EIP-712 signature for the UserOperation
-    userOperation.signature = SafeAccount.formatEip712SingleSignatureToUseroperationSignature(
-        signature,
+    // Format the raw EIP-712 signature into the UserOperation signature. The
+    // Unified Account validates single ops via the multi-chain scheme, so set
+    // isMultiChainSignature: true (without it the bundler rejects the signature).
+    userOperation.signature = SafeAccount.formatSignaturesToUseroperationSignature(
+        [{ signer: ownerAccount.address, signature }],
+        { isMultiChainSignature: true },
     )
 
     console.log(userOperation)
@@ -119,11 +127,6 @@ async function main(): Promise<void> {
     } else {
         console.log("Useroperation execution failed")
     }
-}
-
-// Helper to serialize BigInt values in JSON
-function bigIntReplacer(_key: string, value: unknown): unknown {
-    return typeof value === 'bigint' ? value.toString() : value;
 }
 
 main()

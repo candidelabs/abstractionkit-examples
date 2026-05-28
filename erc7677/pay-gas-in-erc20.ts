@@ -1,6 +1,6 @@
 import { loadEnv, getOrCreateOwner, requireEnv } from '../utils/env'
 import {
-    SafeAccountV0_3_0 as SafeAccount,
+    SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
     Erc7677Paymaster,
     getFunctionSelector,

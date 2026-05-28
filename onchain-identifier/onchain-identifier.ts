@@ -21,7 +21,7 @@
  */
 import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
-    SafeAccountV0_3_0 as SafeAccount,
+    SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
     CandidePaymaster,
     getFunctionSelector,

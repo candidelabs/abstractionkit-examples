@@ -1,9 +1,9 @@
 import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
-    SafeAccountV0_3_0 as SafeAccount,
+    SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
     calculateUserOperationMaxGasCost,
-    CandidePaymaster,
+    Erc7677Paymaster,
     getFunctionSelector,
     createCallData,
 } from "abstractionkit";
@@ -59,17 +59,20 @@ async function main(): Promise<void> {
         //}
     )
 
-    const paymaster = new CandidePaymaster(paymasterUrl)
+    //Erc7677Paymaster speaks the ERC-7677 standard, so it works with any
+    //compliant provider. The provider is auto-detected from the paymaster URL.
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
+    const context = sponsorshipPolicyId ? { sponsorshipPolicyId } : {} // empty context = public gas policies
 
-    const { userOperation: paymasterUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+    const { userOperation: paymasterUserOperation } = await paymaster.createPaymasterUserOperation(
+        smartAccount, userOperation, bundlerUrl, context)
     userOperation = paymasterUserOperation;
 
 
     const cost = calculateUserOperationMaxGasCost(userOperation)
     console.log("This useroperation may cost upto : " + cost + " wei")
     console.log("This example uses a Candide paymaster to sponsor the useroperation, so there is not need to fund the sender account.")
-    console.log("Get early access to Candide's sponsor paymaster by visiting our discord https://discord.gg/KJSzy2Rqtg")
+    console.log("Set up your own gas sponsorship policy at https://dashboard.candide.dev")
 
     //Safe is a multisig that can have multiple owners/signers
     //signUserOperation will create a signature for the provided

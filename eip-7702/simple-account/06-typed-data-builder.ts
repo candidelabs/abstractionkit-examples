@@ -4,8 +4,8 @@
  * `signTypedData(domain, types, message)` primitive and don't want to
  * wrap it in an ExternalSigner.
  *
- * Account class : Simple7702Account
- * Signing API   : Simple7702Account.getUserOperationEip712Data(op, chainId)
+ * Account class : Simple7702AccountV09
+ * Signing API   : Simple7702AccountV09.getUserOperationEip712Data(op, chainId)
  *                 + your own signTypedData
  * Paymaster     : Erc7677Paymaster (sponsored)
  *
@@ -38,7 +38,7 @@
 import {
     AbstractionKitError,
     Erc7677Paymaster,
-    Simple7702Account,
+    Simple7702AccountV09 as Simple7702Account,
     createAndSignEip7702DelegationAuthorization,
     createCallData,
     getFunctionSelector,

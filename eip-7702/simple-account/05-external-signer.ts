@@ -1,24 +1,21 @@
 /**
- * Upgrade an EOA to Simple7702Account (EntryPoint v0.8) with an
+ * Upgrade an EOA to Simple7702AccountV09 (EntryPoint v0.9) with an
  * ExternalSigner.
  *
- * Account class : Simple7702Account
+ * Account class : Simple7702AccountV09
  * Signing method: signUserOperationWithSigner(op, signer, chainId)
  * Signer adapter: fromViem
- * Paymaster     : Erc7677Paymaster
+ * Paymaster     : Erc7677Paymaster (sponsored, provider-agnostic)
  *
- * Two signatures happen here, both via the viem LocalAccount (no raw
- * private key is passed to abstractionkit):
- *   1. The EIP-7702 delegation authorization uses the callback overload
- *      of createAndSignEip7702DelegationAuthorization, delegating to
- *      localAccount.sign. This authorizes the 7702 transaction type
- *      itself and is separate from the UserOperation signature.
- *   2. The UserOperation hash is signed via the ExternalSigner.
+ * Delegation authorization: signed via the callback overload of
+ * createAndSignEip7702DelegationAuthorization using the viem LocalAccount's
+ * .sign, so no raw private key reaches abstractionkit; separate from the
+ * UserOperation signature.
  */
 
 import {
     Erc7677Paymaster,
-    Simple7702Account,
+    Simple7702AccountV09,
     createAndSignEip7702DelegationAuthorization,
     createCallData,
     fromViem,
@@ -40,8 +37,9 @@ async function main(): Promise<void> {
     const signer = fromViem(localAccount)
     console.log('EOA     :', publicAddress)
 
-    // 2. Initialize the Simple7702 account (sender = EOA address after delegation).
-    const smartAccount = new Simple7702Account(publicAddress)
+    // 2. Initialize the Simple7702 v0.9 account and the paymaster client.
+    const smartAccount = new Simple7702AccountV09(publicAddress)
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
 
     // 3. Build a MetaTransaction: mint an NFT to the EOA.
     const nft = '0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336'
@@ -71,8 +69,7 @@ async function main(): Promise<void> {
         )
     }
 
-    // 6. Sponsor gas via an ERC-7677 paymaster.
-    const paymaster = new Erc7677Paymaster(paymasterUrl)
+    // 6. Sponsor gas via an ERC-7677 paymaster (provider-agnostic).
     const { userOperation: sponsoredOp } = await paymaster.createPaymasterUserOperation(
         smartAccount, userOp, bundlerUrl,
         sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,

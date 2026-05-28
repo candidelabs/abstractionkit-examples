@@ -24,7 +24,7 @@
 import {
     AbstractionKitError,
     CandidePaymaster,
-    SafeAccountV0_3_0 as SafeAccount,
+    SafeMultiChainSigAccountV1 as SafeAccount,
     createCallData,
     fromSafeWebauthn,
     getFunctionSelector,

@@ -1,5 +1,5 @@
 import { requireEnv, getOrCreateOwner } from '../../utils/env'
-import { Simple7702Account } from "abstractionkit"
+import { Simple7702AccountV09 as Simple7702Account } from "abstractionkit"
 import { createPublicClient, http, formatEther } from "viem"
 
 // Revokes an EIP-7702 delegation by setting the EOA's code to address(0).

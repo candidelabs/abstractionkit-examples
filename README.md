@@ -24,6 +24,7 @@ Get AbstractionKit examples running in minutes:
     ```
 
     * **Default Network:** Examples run on Arbitrum Sepolia. Change your `.env` if you prefer another network.
+    * **Default Account:** Examples use the Safe Unified Account (`SafeMultiChainSigAccountV1`) on EntryPoint v0.9 — the same account works single-chain and across chains. See [chain-abstraction](./chain-abstraction/) for the multichain flow.
     * **Endpoints:** `BUNDLER_URL` and `PAYMASTER_URL` use public endpoints. Get your own dedicated endpoints from the [Candide Dashboard](https://dashboard.candide.dev/).
     * **Gas Sponsorship (Optional):** Set `SPONSORSHIP_POLICY_ID` after creating a gas policy on the Dashboard.
     * **ERC-20 Payments:** See [supported ERC-20 tokens](https://docs.candide.dev/wallet/paymaster/tokens-supported/) for gas payments.

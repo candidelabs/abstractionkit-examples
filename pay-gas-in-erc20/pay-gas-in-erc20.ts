@@ -1,6 +1,6 @@
 import { loadEnv, getOrCreateOwner, requireEnv } from '../utils/env'
 import {
-    SafeAccountV0_3_0 as SafeAccount,
+    SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
     CandidePaymaster,
     getFunctionSelector,
@@ -59,8 +59,6 @@ async function main(): Promise<void> {
         bundlerUrl, //the bundler rpc is used to estimate the gas limits.
         {
             //add some extra buffer to the estimated gas limits
-            preVerificationGasPercentageMultiplier: 130,
-            callGasLimitPercentageMultiplier: 130,
 
             //uncomment the following values for polygon or any chains where
             //gas prices change rapidly
@@ -76,7 +74,7 @@ async function main(): Promise<void> {
 
     console.log("This example uses Candide Token Paymaster");
     console.log("Please visit https://dashboard.candide.dev/ to get a Paymaster URL");
-    console.log("Visit our Discord to get some CTT token for testing");
+    console.log("Get test tokens from our faucet https://dashboard.candide.dev/faucet");
 
     if (tokenSelected) {
         // v0.3.3+: createTokenPaymasterUserOperation returns the maximum
@@ -88,6 +86,13 @@ async function main(): Promise<void> {
             userOperation,
             tokenSelected.address,
             bundlerUrl,
+            undefined, // context
+            {
+                // Bumps default verificationGasLimit headroom from 10% to 20%.
+                // Some bundlers require verificationGasLimit >= used + 2000;
+                // the default sometimes lands within that buffer ("has only -1277").
+                // verificationGasLimitPercentageMultiplier: 20,
+            },
         )
         userOperation = tokenOp
         const cost = tokenQuote?.tokenCost ?? 0n

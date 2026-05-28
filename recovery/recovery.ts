@@ -1,6 +1,6 @@
 import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
-    SafeAccountV0_3_0 as SafeAccount,
+    SafeMultiChainSigAccountV1 as SafeAccount,
     calculateUserOperationMaxGasCost,
     CandidePaymaster,
     SocialRecoveryModule
@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     const cost = calculateUserOperationMaxGasCost(userOperation)
     console.log("This useroperation may cost upto : " + cost + " wei")
     console.log("This example uses a Candide paymaster to sponsor the useroperation, so there is not need to fund the sender account.")
-    console.log("Get early access to Candide's sponsor paymaster by visiting our Discord")
+    console.log("Set up your own gas sponsorship policy at https://dashboard.candide.dev")
 
     //Safe is a multisig that can have multiple owners/signers
     //signUserOperation will create a signature for the provided

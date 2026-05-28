@@ -1,6 +1,6 @@
 import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
-    SafeAccountV0_3_0,
+    SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
     calculateUserOperationMaxGasCost,
     CandidePaymaster,
@@ -16,7 +16,7 @@ async function main(): Promise<void> {
     //have not been deployed yet for its first useroperation.
     //You can store the accountAddress to use it to initialize 
     //the SafeAccount object for the following useroperations
-    let smartAccount = SafeAccountV0_3_0.initializeNewAccount(
+    let smartAccount = SafeAccount.initializeNewAccount(
         [ownerPublicAddress],
     )
 

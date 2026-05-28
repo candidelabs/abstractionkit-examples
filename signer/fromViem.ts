@@ -13,7 +13,7 @@ import {
     Erc7677Paymaster,
     ExternalSigner,
     MetaTransaction,
-    SafeAccountV0_3_0 as SafeAccount,
+    SafeMultiChainSigAccountV1 as SafeAccount,
     createCallData,
     fromViem,
     getFunctionSelector,

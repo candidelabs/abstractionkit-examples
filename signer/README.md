@@ -80,7 +80,6 @@ ever invoked.
 
 ## Account-specific flows
 
-- `../eip-7702/simple-account/05-external-signer.ts` - Simple7702 (EP v0.8)
-- `../eip-7702/simple-account/06-external-signer-v09.ts` - Simple7702 (EP v0.9, two-phase paymaster)
+- `../eip-7702/simple-account/05-external-signer.ts` - Simple7702 (EP v0.9)
 - `../eip-7702/calibur-account/04-external-signer.ts` - Calibur
 - `../chain-abstraction/add-owner-with-external-signer.ts` - multi-chain, multi-op with one signature

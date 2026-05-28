@@ -107,7 +107,7 @@ async function main(): Promise<void> {
         privateKey,
     )
 
-    // v0.9 EntryPoint: commit/finalize paymaster flow (see 03-upgrade-eoa-ep-v09.ts).
+    // v0.9 EntryPoint: commit/finalize paymaster flow (see 03-parallel-signing.ts).
     // The paymaster reads the v0.9 EntryPoint from the account — no entrypoint override.
     console.log("Paymaster commit: estimating gas...")
     const v09Commit = await paymaster.createSponsorPaymasterUserOperation(

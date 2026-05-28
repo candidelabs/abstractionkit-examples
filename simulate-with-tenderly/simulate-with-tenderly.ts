@@ -1,6 +1,6 @@
 import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
-    SafeAccountV0_3_0,
+    SafeMultiChainSigAccountV1 as SafeAccountV0_3_0,
     MetaTransaction,
     getFunctionSelector,
     createCallData,

@@ -58,12 +58,12 @@ npx ts-node <folder>/<script>.ts
 | Pay gas with ERC-20 — any ERC-7677 provider | `erc7677/` | `pay-gas-in-erc20.ts` |
 | Batch multiple txs | `batch-transactions/` | `batch-transactions.ts` |
 | Account recovery | `recovery/` | `recovery.ts` |
-| EIP-7702 delegation | `eip-7702/simple-account/` | `01-upgrade-eoa.ts` |
+| EIP-7702 delegation (EntryPoint v0.9) | `eip-7702/simple-account/` | `01-upgrade-eoa.ts` |
 | EIP-7702 pay gas in ERC-20 | `eip-7702/simple-account/` | `02-upgrade-eoa-erc20-gas.ts` |
-| EIP-7702 EP v0.9 | `eip-7702/simple-account/` | `03-upgrade-eoa-ep-v09.ts` |
+| EIP-7702 two-phase parallel signing (sponsor latency optimization) | `eip-7702/simple-account/` | `03-parallel-signing.ts` |
 | EIP-7702 revoke delegation | `eip-7702/simple-account/` | `04-revoke-delegation.ts` |
-| EIP-7702 typed-data builder (drive signTypedData yourself) | `eip-7702/simple-account/` | `07-typed-data-builder.ts` |
-| EIP-7702 migrate v0.8 → v0.9 (sponsored, no revoke) | `eip-7702/simple-account/` | `08-migrate-v08-to-v09.ts` |
+| EIP-7702 typed-data builder (drive signTypedData yourself) | `eip-7702/simple-account/` | `06-typed-data-builder.ts` |
+| EIP-7702 migrate v0.8 → v0.9 (sponsored, no revoke) | `eip-7702/simple-account/` | `07-migrate-v08-to-v09.ts` |
 | Debug with Tenderly | `simulate-with-tenderly/` | `simulate-with-tenderly.ts` |
 | Multichain-chain add owner | `chain-abstraction/` | `add-owner.ts` |
 | Multichain add guardian | `chain-abstraction/` | `add-guardian.ts` |
@@ -88,8 +88,7 @@ New in abstractionkit v0.3.2: the `ExternalSigner` API lets you plug viem, ether
 | ethers Wallet | `signer/` | `fromEthersWallet.ts` |
 | viem WalletClient (typed-data path) | `signer/` | `fromViemWalletClient.ts` |
 | Custom (HSM / MPC / hardware) | `signer/` | `customSigner.ts` |
-| Simple7702 external signer | `eip-7702/simple-account/` | `05-external-signer.ts` |
-| Simple7702 EP v0.9 external signer | `eip-7702/simple-account/` | `06-external-signer-v09.ts` |
+| Simple7702 external signer (EntryPoint v0.9) | `eip-7702/simple-account/` | `05-external-signer.ts` |
 | Calibur external signer | `eip-7702/calibur-account/` | `04-external-signer.ts` |
 | Multichain add owner (external signer) | `chain-abstraction/` | `add-owner-with-external-signer.ts` |
 
@@ -172,7 +171,7 @@ Canonical per-adapter examples: `signer/`. Account-specific starters for the flo
 All examples follow this structure:
 
 ```typescript
-import { SafeAccountV0_3_0 as SafeAccount, MetaTransaction, CandidePaymaster } from "abstractionkit";
+import { SafeMultiChainSigAccountV1 as SafeAccount, MetaTransaction, CandidePaymaster } from "abstractionkit";
 
 // 1. Initialize account
 let smartAccount = SafeAccount.initializeNewAccount([ownerPublicAddress]);
@@ -208,11 +207,11 @@ const receipt = await response.included();
 
 | Class | Use Case | EntryPoint | External Signer method |
 |-------|----------|------------|------------------------|
-| `SafeAccountV0_3_0` | Most examples (recommended) | v0.7 | `signUserOperationWithSigners(op, signers[], chainId)` |
+| `SafeMultiChainSigAccountV1` | Most examples (recommended) — single-chain + Safe Unified Account multichain | v0.9 | `signUserOperationWithSigners(op, signers[], chainId)` (single), `signUserOperationsWithSigners(ops[], signers[])` (multichain) |
+| `SafeAccountV0_3_0` | Legacy v0.7 compatibility | v0.7 | `signUserOperationWithSigners(op, signers[], chainId)` |
 | `SafeAccountV0_2_0` | Legacy/v0.6 compatibility | v0.6 | `signUserOperationWithSigners(op, signers[], chainId)` |
-| `Simple7702Account` | EIP-7702 delegation | v0.8 | `signUserOperationWithSigner(op, signer, chainId)` |
-| `Simple7702AccountV09` | EIP-7702 delegation (EP v0.9) | v0.9 | `signUserOperationWithSigner(op, signer, chainId)` |
-| `SafeMultiChainSigAccountV1` | Chain abstraction (Safe Unified Account) | v0.9 | `signUserOperationsWithSigners(ops[], signers[])` |
+| `Simple7702AccountV09` | EIP-7702 delegation (recommended) | v0.9 | `signUserOperationWithSigner(op, signer, chainId)` |
+| `Simple7702Account` | EIP-7702 legacy v0.8 (used in the v0.8→v0.9 migration example) | v0.8 | `signUserOperationWithSigner(op, signer, chainId)` |
 | `Calibur7702Account` | EIP-7702 Calibur (passkeys, key mgmt) | v0.8 (default) | `signUserOperationWithSigner(op, signer, chainId)` |
 
 ## Common Commands

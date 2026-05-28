@@ -1,6 +1,6 @@
 import { loadEnv, getOrCreateOwner, requireEnv } from '../../utils/env'
 import {
-    Simple7702Account,
+    Simple7702AccountV09 as Simple7702Account,
     getFunctionSelector,
     createCallData,
     createAndSignEip7702DelegationAuthorization,
@@ -62,7 +62,7 @@ async function main(): Promise<void> {
     // Step 4: Pay gas with ERC-20 token via token paymaster
     // ──────────────────────────────────────────────────────────────────────
     // Requires a Candide Paymaster URL from https://dashboard.candide.dev/
-    // and a TOKEN_ADDRESS in .env. Visit Discord for test CTT tokens.
+    // and a TOKEN_ADDRESS in .env. Get test tokens from https://dashboard.candide.dev/faucet
     const paymaster = new CandidePaymaster(paymasterUrl)
 
     const tokensSupported = await paymaster.fetchSupportedERC20TokensAndPaymasterMetadata(smartAccount.entrypointAddress)
