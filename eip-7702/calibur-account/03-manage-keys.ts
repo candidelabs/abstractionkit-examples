@@ -30,7 +30,7 @@ import { loadEnv, getOrCreateOwner } from '../../utils/env'
 import { generatePrivateKey, privateKeyToAddress } from 'viem/accounts'
 import {
     Calibur7702Account,
-    CandidePaymaster,
+    Erc7677Paymaster,
     CaliburKeyType,
     ZeroAddress,
     getFunctionSelector,
@@ -42,7 +42,7 @@ async function main(): Promise<void> {
     const { publicAddress, privateKey } = getOrCreateOwner()
 
     const smartAccount = new Calibur7702Account(publicAddress)
-    const paymaster = new CandidePaymaster(paymasterUrl)
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
 
     // This example requires an already-delegated account.
     const delegated = await smartAccount.isDelegatedToThisAccount(nodeUrl)
@@ -97,8 +97,8 @@ async function main(): Promise<void> {
     let registerOp = await smartAccount.createUserOperation(
         registerTxs, nodeUrl, bundlerUrl,
     )
-    const { userOperation: sponsoredRegisterOp } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, registerOp, bundlerUrl, sponsorshipPolicyId,
+    const { userOperation: sponsoredRegisterOp } = await paymaster.createPaymasterUserOperation(
+        smartAccount, registerOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
     registerOp = sponsoredRegisterOp
     registerOp.signature = smartAccount.signUserOperation(
@@ -142,8 +142,8 @@ async function main(): Promise<void> {
         [{ to: nftContractAddress, value: 0n, data: mintCallData }],
         nodeUrl, bundlerUrl,
     )
-    const { userOperation: sponsoredSecondaryOp } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, secondaryOp, bundlerUrl, sponsorshipPolicyId,
+    const { userOperation: sponsoredSecondaryOp } = await paymaster.createPaymasterUserOperation(
+        smartAccount, secondaryOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
     secondaryOp = sponsoredSecondaryOp
     secondaryOp.signature = smartAccount.signUserOperation(
@@ -181,8 +181,8 @@ async function main(): Promise<void> {
     let updateOp = await smartAccount.createUserOperation(
         [updateTx], nodeUrl, bundlerUrl,
     )
-    const { userOperation: sponsoredUpdateOp } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, updateOp, bundlerUrl, sponsorshipPolicyId,
+    const { userOperation: sponsoredUpdateOp } = await paymaster.createPaymasterUserOperation(
+        smartAccount, updateOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
     updateOp = sponsoredUpdateOp
     updateOp.signature = smartAccount.signUserOperation(
@@ -215,8 +215,8 @@ async function main(): Promise<void> {
     let revokeOp = await smartAccount.createUserOperation(
         [revokeTx], nodeUrl, bundlerUrl,
     )
-    const { userOperation: sponsoredRevokeOp } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, revokeOp, bundlerUrl, sponsorshipPolicyId,
+    const { userOperation: sponsoredRevokeOp } = await paymaster.createPaymasterUserOperation(
+        smartAccount, revokeOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
     revokeOp = sponsoredRevokeOp
     revokeOp.signature = smartAccount.signUserOperation(

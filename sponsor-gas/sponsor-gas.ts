@@ -62,7 +62,9 @@ async function main(): Promise<void> {
     //Erc7677Paymaster speaks the ERC-7677 standard, so it works with any
     //compliant provider. The provider is auto-detected from the paymaster URL.
     const paymaster = new Erc7677Paymaster(paymasterUrl)
-    const context = sponsorshipPolicyId ? { sponsorshipPolicyId } : {} // empty context = public gas policies
+    //Candide and Pimlico read `sponsorshipPolicyId`; Alchemy reads `policyId`.
+    //Send both so the same context is portable across providers; empty = public gas policies.
+    const context = sponsorshipPolicyId ? { sponsorshipPolicyId, policyId: sponsorshipPolicyId } : {}
 
     const { userOperation: paymasterUserOperation } = await paymaster.createPaymasterUserOperation(
         smartAccount, userOperation, bundlerUrl, context)
@@ -71,7 +73,7 @@ async function main(): Promise<void> {
 
     const cost = calculateUserOperationMaxGasCost(userOperation)
     console.log("This useroperation may cost upto : " + cost + " wei")
-    console.log("This example uses a Candide paymaster to sponsor the useroperation, so there is not need to fund the sender account.")
+    console.log("This example uses Erc7677Paymaster (any ERC-7677 provider) to sponsor the useroperation, so there is no need to fund the sender account.")
     console.log("Set up your own gas sponsorship policy at https://dashboard.candide.dev")
 
     //Safe is a multisig that can have multiple owners/signers

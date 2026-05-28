@@ -2,7 +2,7 @@ import { loadEnv, getOrCreateOwner, requireEnv } from '../utils/env'
 import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     AllowanceModule,
-    CandidePaymaster,
+    Erc7677Paymaster,
 } from "abstractionkit";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createPublicClient, http, parseAbi } from "viem";
@@ -82,10 +82,10 @@ async function main(): Promise<void> {
             bundlerUrl,
         );
 
-    const paymaster = new CandidePaymaster(paymasterUrl);
+    const paymaster = new Erc7677Paymaster(paymasterUrl);
 
-    const { userOperation: sponsoredSetAllowanceUserOp } = await paymaster.createSponsorPaymasterUserOperation(
-        sourceSafeAccount, setAllowanceUserOp, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+    const { userOperation: sponsoredSetAllowanceUserOp } = await paymaster.createPaymasterUserOperation(
+        sourceSafeAccount, setAllowanceUserOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined)
     setAllowanceUserOp = sponsoredSetAllowanceUserOp;
 
     setAllowanceUserOp.signature = sourceSafeAccount.signUserOperation(
@@ -126,8 +126,8 @@ async function main(): Promise<void> {
 
     let allowanceTransferUserOp = await delegateSafeAccount.createUserOperation([allowanceTransferMetaTransaction], nodeUrl, bundlerUrl);
 
-    const { userOperation: sponsoredAllowanceTransferUserOp } = await paymaster.createSponsorPaymasterUserOperation(
-        delegateSafeAccount, allowanceTransferUserOp, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+    const { userOperation: sponsoredAllowanceTransferUserOp } = await paymaster.createPaymasterUserOperation(
+        delegateSafeAccount, allowanceTransferUserOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined)
     allowanceTransferUserOp = sponsoredAllowanceTransferUserOp;
 
     allowanceTransferUserOp.signature = sourceSafeAccount.signUserOperation(

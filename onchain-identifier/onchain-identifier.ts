@@ -23,7 +23,7 @@ import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
-    CandidePaymaster,
+    Erc7677Paymaster,
     getFunctionSelector,
     createCallData,
     sendJsonRpcRequest,
@@ -74,9 +74,9 @@ async function main(): Promise<void> {
     console.log('Tag in userOp.callData :', tagged)
 
     // ─── 3. Sponsor, sign, send ───────────────────────────────────────────
-    const paymaster = new CandidePaymaster(paymasterUrl)
-    const { userOperation: sponsoredOp } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, userOp, bundlerUrl, sponsorshipPolicyId,
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
+    const { userOperation: sponsoredOp } = await paymaster.createPaymasterUserOperation(
+        smartAccount, userOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
     userOp = sponsoredOp
     userOp.signature = smartAccount.signUserOperation(userOp, [ownerKey], chainId)

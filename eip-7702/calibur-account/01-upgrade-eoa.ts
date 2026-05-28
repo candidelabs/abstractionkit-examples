@@ -4,7 +4,7 @@
  * This example demonstrates how to:
  * 1. Delegate an EOA to the Calibur singleton via EIP-7702
  * 2. Batch multiple transactions in a single UserOperation
- * 3. Sponsor gas with CandidePaymaster
+ * 3. Sponsor gas with Erc7677Paymaster
  * 4. Sign with a private key string or a signer callback (e.g. viem)
  *
  * After delegation, the EOA address stays the same but gains smart account
@@ -21,7 +21,7 @@ import { loadEnv, getOrCreateOwner } from '../../utils/env'
 import { privateKeyToAccount } from 'viem/accounts'
 import {
     Calibur7702Account,
-    CandidePaymaster,
+    Erc7677Paymaster,
     createAndSignEip7702DelegationAuthorization,
     getFunctionSelector,
     createCallData,
@@ -32,7 +32,7 @@ async function main(): Promise<void> {
     const { publicAddress, privateKey } = getOrCreateOwner()
 
     // ──────────────────────────────────────────────────────────────────────
-    // Step 1: Initialize the Calibur account and CandidePaymaster
+    // Step 1: Initialize the Calibur account and Erc7677Paymaster
     // ──────────────────────────────────────────────────────────────────────
     // The account address is your EOA address. After delegation, it becomes
     // a smart account while keeping the same address.
@@ -45,8 +45,8 @@ async function main(): Promise<void> {
         console.log("You can run 02-passkeys.ts or 03-manage-keys.ts directly.")
     }
 
-    // CandidePaymaster sponsors gas so the EOA doesn't need native tokens.
-    const paymaster = new CandidePaymaster(paymasterUrl)
+    // Erc7677Paymaster sponsors gas so the EOA doesn't need native tokens.
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
 
     // ──────────────────────────────────────────────────────────────────────
     // Step 2: Build transactions
@@ -113,12 +113,12 @@ async function main(): Promise<void> {
     // }
 
     // ──────────────────────────────────────────────────────────────────────
-    // Step 5: Sponsor gas with CandidePaymaster
+    // Step 5: Sponsor gas with Erc7677Paymaster
     // ──────────────────────────────────────────────────────────────────────
     // In EP v0.8, paymaster data is included in the UserOperation hash,
     // so it must be set before signing.
-    const { userOperation: sponsoredUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId,
+    const { userOperation: sponsoredUserOperation } = await paymaster.createPaymasterUserOperation(
+        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
     userOperation = sponsoredUserOperation
 
@@ -152,7 +152,7 @@ async function main(): Promise<void> {
             console.log("EOA upgraded to Calibur smart account!")
         }
         console.log("Minted 2 NFTs in a single batched UserOperation!")
-        console.log("Gas was sponsored by CandidePaymaster.")
+        console.log("Gas was sponsored by Erc7677Paymaster.")
         console.log("Transaction:", receipt.receipt.transactionHash)
     } else {
         console.log("UserOperation execution failed")

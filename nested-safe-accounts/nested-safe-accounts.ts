@@ -4,7 +4,7 @@ import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
-    CandidePaymaster,
+    Erc7677Paymaster,
     getFunctionSelector,
     createCallData,
     SendUseroperationResponse,
@@ -56,10 +56,10 @@ async function main(): Promise<void> {
         nodeUrl,
         bundlerUrl,
     )
-    const paymaster = new CandidePaymaster(paymasterUrl);
+    const paymaster = new Erc7677Paymaster(paymasterUrl);
 
-    const { userOperation: paymasterSubAccount1UserOperation } = await paymaster.createSponsorPaymasterUserOperation(
-        subAccount1, subAccount1DeployMainAccountUserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+    const { userOperation: paymasterSubAccount1UserOperation } = await paymaster.createPaymasterUserOperation(
+        subAccount1, subAccount1DeployMainAccountUserOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined)
     subAccount1DeployMainAccountUserOperation = paymasterSubAccount1UserOperation;
 
     subAccount1DeployMainAccountUserOperation.signature = subAccount1.signUserOperation(
@@ -137,8 +137,8 @@ async function main(): Promise<void> {
         }
     )
 
-    const { userOperation: paymasterUserOperation1 } = await paymaster.createSponsorPaymasterUserOperation(
-        mainAccount, mainAccountUserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+    const { userOperation: paymasterUserOperation1 } = await paymaster.createPaymasterUserOperation(
+        mainAccount, mainAccountUserOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined)
     mainAccountUserOperation = paymasterUserOperation1;
 
     mainAccountUserOperation.signature = SafeAccount.formatSignaturesToUseroperationSignature(
@@ -168,8 +168,8 @@ async function main(): Promise<void> {
         nodeUrl,
         bundlerUrl,
     )
-    const { userOperation: paymasterSubAccount1UserOperation11 } = await paymaster.createSponsorPaymasterUserOperation(
-        subAccount1, subAccount1UserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+    const { userOperation: paymasterSubAccount1UserOperation11 } = await paymaster.createPaymasterUserOperation(
+        subAccount1, subAccount1UserOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined)
     subAccount1UserOperation = paymasterSubAccount1UserOperation11;
 
     subAccount1UserOperation.signature = subAccount1.signUserOperation(
@@ -182,8 +182,8 @@ async function main(): Promise<void> {
         nodeUrl,
         bundlerUrl,
     )
-    const { userOperation: paymasterSubAccount2UserOperation } = await paymaster.createSponsorPaymasterUserOperation(
-        subAccount2, subAccount2UserOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+    const { userOperation: paymasterSubAccount2UserOperation } = await paymaster.createPaymasterUserOperation(
+        subAccount2, subAccount2UserOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined)
     subAccount2UserOperation = paymasterSubAccount2UserOperation;
 
     subAccount2UserOperation.signature = subAccount2.signUserOperation(

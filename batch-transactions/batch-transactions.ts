@@ -3,7 +3,7 @@ import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
     calculateUserOperationMaxGasCost,
-    CandidePaymaster,
+    Erc7677Paymaster,
     getFunctionSelector,
     createCallData,
 } from "abstractionkit";
@@ -66,9 +66,9 @@ async function main(): Promise<void> {
         }
     )
 
-    const paymaster = new CandidePaymaster(paymasterUrl)
-    const { userOperation: paymasterUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId)
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
+    const { userOperation: paymasterUserOperation } = await paymaster.createPaymasterUserOperation(
+        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined)
     userOperation = paymasterUserOperation;
 
     const cost = calculateUserOperationMaxGasCost(userOperation)

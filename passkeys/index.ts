@@ -1,10 +1,10 @@
 /**
  * Passkey-owned Safe Account — sponsored UserOp on a single chain.
  *
- * Account class : SafeAccountV0_3_0
+ * Account class : SafeMultiChainSigAccountV1 (aliased as SafeAccount)
  * Signing method: signUserOperationWithSigners(op, signers, chainId)
  * Signer adapter: fromSafeWebauthn (no manual hash → assertion → format dance)
- * Paymaster     : CandidePaymaster (sponsored)
+ * Paymaster     : Erc7677Paymaster (sponsored)
  *
  * The adapter handles both isInit phases of the Safe Passkeys flow:
  *  - isInit=true  → signer.address = shared signer (used during the deployment op)
@@ -23,7 +23,7 @@
 
 import {
     AbstractionKitError,
-    CandidePaymaster,
+    Erc7677Paymaster,
     SafeMultiChainSigAccountV1 as SafeAccount,
     createCallData,
     fromSafeWebauthn,
@@ -45,7 +45,7 @@ import {
 // Optional: Safe Passkeys contract overrides. Pin a specific module
 // version by setting these and passing them to BOTH `initializeNewAccount`
 // and `fromSafeWebauthn` (and `createUserOperation` when not relying on
-// SafeAccountV0_3_0's defaults). Leave undefined to use abstractionkit's
+// SafeAccount's defaults). Leave undefined to use abstractionkit's
 // defaults — that's what this example does.
 //
 // Concrete values for Safe Passkeys v0.2.1 on Arbitrum Sepolia:
@@ -110,9 +110,9 @@ async function main(): Promise<void> {
     )
 
     // 5. Sponsor gas via Candide paymaster.
-    const paymaster = new CandidePaymaster(paymasterUrl)
-    const { userOperation: sponsoredOp } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, userOp, bundlerUrl, sponsorshipPolicyId,
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
+    const { userOperation: sponsoredOp } = await paymaster.createPaymasterUserOperation(
+        smartAccount, userOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
     userOp = sponsoredOp
 

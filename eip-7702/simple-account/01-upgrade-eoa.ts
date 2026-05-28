@@ -6,7 +6,7 @@ import {
     getFunctionSelector,
     createCallData,
     createAndSignEip7702DelegationAuthorization,
-    CandidePaymaster,
+    Erc7677Paymaster,
 } from "abstractionkit"
 
 // Upgrades an EOA to a Simple7702 smart account (EntryPoint v0.9) with gas
@@ -19,7 +19,7 @@ async function main(): Promise<void> {
     const { publicAddress: eoaAddress, privateKey } = getOrCreateOwner()
 
     const smartAccount = new Simple7702Account(eoaAddress)
-    const paymaster = new CandidePaymaster(paymasterUrl)
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
 
     const nftContractAddress = "0x9a7af758aE5d7B6aAE84fe4C5Ba67c041dFE5336"
     const mintCallData = createCallData(
@@ -51,8 +51,8 @@ async function main(): Promise<void> {
             console.log("EOA already delegated — skipping EIP-7702 authorization")
         }
 
-        const { userOperation: sponsored } = await paymaster.createSponsorPaymasterUserOperation(
-            smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId,
+        const { userOperation: sponsored } = await paymaster.createPaymasterUserOperation(
+            smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
         )
         userOperation = sponsored
 

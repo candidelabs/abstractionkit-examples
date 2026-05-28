@@ -2,7 +2,7 @@ import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     calculateUserOperationMaxGasCost,
-    CandidePaymaster,
+    Erc7677Paymaster,
     SocialRecoveryModule
 } from "abstractionkit";
 
@@ -50,10 +50,10 @@ async function main(): Promise<void> {
         bundlerUrl, //the bundler rpc is used to estimate the gas limits.
     )
 
-    const paymaster = new CandidePaymaster(paymasterUrl)
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
 
-    const { userOperation: paymasterUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+    const { userOperation: paymasterUserOperation } = await paymaster.createPaymasterUserOperation(
+        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined)
     userOperation = paymasterUserOperation;
 
     const cost = calculateUserOperationMaxGasCost(userOperation)

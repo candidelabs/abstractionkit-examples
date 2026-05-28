@@ -27,7 +27,7 @@ import { loadEnv, getOrCreateOwner } from '../../utils/env'
 import { toBytes, toHex } from 'viem'
 import {
     Calibur7702Account,
-    CandidePaymaster,
+    Erc7677Paymaster,
     createAndSignEip7702DelegationAuthorization,
     getFunctionSelector,
     createCallData,
@@ -42,7 +42,7 @@ async function main(): Promise<void> {
     const { publicAddress, privateKey } = getOrCreateOwner()
 
     const smartAccount = new Calibur7702Account(publicAddress)
-    const paymaster = new CandidePaymaster(paymasterUrl)
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
     const node = JsonRpcNode.from(nodeUrl)
 
     // Check if the EOA is already delegated to the expected Calibur singleton.
@@ -134,8 +134,8 @@ async function main(): Promise<void> {
         )
     }
 
-    const { userOperation: sponsoredRegisterOp } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, registerOp, bundlerUrl, sponsorshipPolicyId,
+    const { userOperation: sponsoredRegisterOp } = await paymaster.createPaymasterUserOperation(
+        smartAccount, registerOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
     registerOp = sponsoredRegisterOp
 
@@ -198,8 +198,8 @@ async function main(): Promise<void> {
     )
 
     // Sponsor gas before signing (EP v0.8 includes paymaster data in hash)
-    const { userOperation: sponsoredUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId,
+    const { userOperation: sponsoredUserOperation } = await paymaster.createPaymasterUserOperation(
+        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
     )
     userOperation = sponsoredUserOperation
 

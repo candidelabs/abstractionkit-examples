@@ -27,7 +27,7 @@ import { privateKeyToAccount } from 'viem/accounts'
 import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
-    CandidePaymaster,
+    Erc7677Paymaster,
     EIP712_SAFE_OPERATION_PRIMARY_TYPE,
     calculateUserOperationMaxGasCost,
     getFunctionSelector,
@@ -69,9 +69,9 @@ async function main(): Promise<void> {
     )
 
     // Sponsor with paymaster
-    const paymaster = new CandidePaymaster(paymasterUrl)
-    const { userOperation: paymasterUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId)
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
+    const { userOperation: paymasterUserOperation } = await paymaster.createPaymasterUserOperation(
+        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined)
     userOperation = paymasterUserOperation;
 
     const cost = calculateUserOperationMaxGasCost(userOperation)

@@ -28,11 +28,11 @@ eip-7702/
 ### Initialization
 
 ```ts
-import { Simple7702Account } from "abstractionkit";
+import { Simple7702AccountV09 } from "abstractionkit";
 
 const eoaDelegatorPublicAddress = "0xBdbc5FBC9cA8C3F514D073eC3de840Ac84FC6D31";
 
-const smartAccount = new Simple7702Account(eoaDelegatorPublicAddress);
+const smartAccount = new Simple7702AccountV09(eoaDelegatorPublicAddress);
 ```
 
 ### UserOperation Creation

@@ -5,7 +5,7 @@ import {
     calculateUserOperationMaxGasCost,
     getFunctionSelector,
     createCallData,
-    CandidePaymaster,
+    Erc7677Paymaster,
 } from "abstractionkit";
 
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
@@ -76,10 +76,10 @@ async function main(): Promise<void> {
         }
     )
 
-    const paymaster = new CandidePaymaster(paymasterUrl)
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
 
-    const { userOperation: paymasterUserOperation } = await paymaster.createSponsorPaymasterUserOperation(
-        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId) // sponsorshipPolicyId will have no effect if empty
+    const { userOperation: paymasterUserOperation } = await paymaster.createPaymasterUserOperation(
+        smartAccount, userOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined)
     userOperation = paymasterUserOperation;
 
     const cost = calculateUserOperationMaxGasCost(userOperation)

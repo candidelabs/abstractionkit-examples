@@ -1,6 +1,6 @@
 import { loadEnv, getOrCreateOwner } from '../utils/env'
 import {
-    SafeMultiChainSigAccountV1 as SafeAccountV0_3_0,
+    SafeMultiChainSigAccountV1,
     MetaTransaction,
     getFunctionSelector,
     createCallData,
@@ -20,7 +20,7 @@ async function main(): Promise<void> {
         return;
     }
 
-    const smartAccount = SafeAccountV0_3_0.initializeNewAccount(
+    const smartAccount = SafeMultiChainSigAccountV1.initializeNewAccount(
         [ownerPublicAddress],
     )
 

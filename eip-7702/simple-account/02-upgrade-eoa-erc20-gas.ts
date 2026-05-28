@@ -4,7 +4,7 @@ import {
     getFunctionSelector,
     createCallData,
     createAndSignEip7702DelegationAuthorization,
-    CandidePaymaster,
+    Erc7677Paymaster,
 } from "abstractionkit"
 
 // Same as 01-upgrade-eoa.ts, but gas is paid with an ERC-20 token
@@ -63,31 +63,20 @@ async function main(): Promise<void> {
     // ──────────────────────────────────────────────────────────────────────
     // Requires a Candide Paymaster URL from https://dashboard.candide.dev/
     // and a TOKEN_ADDRESS in .env. Get test tokens from https://dashboard.candide.dev/faucet
-    const paymaster = new CandidePaymaster(paymasterUrl)
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
 
-    const tokensSupported = await paymaster.fetchSupportedERC20TokensAndPaymasterMetadata(smartAccount.entrypointAddress)
-    const tokenSelected = tokensSupported.tokens.find(
-        token => token.address.toLowerCase() === tokenAddress.toLowerCase()
-    )
-
-    if (!tokenSelected) {
-        console.log("Token " + tokenAddress + " is not supported by this paymaster.")
-        return
-    }
-
-    // v0.3.3+: createTokenPaymasterUserOperation returns the maximum
-    // token cost (`tokenQuote.tokenCost`) and exchange rate alongside
-    // the UserOperation, so a separate `calculateUserOperationErc20TokenMaxGasCost`
-    // round-trip is no longer needed for cost display.
-    const { userOperation: tokenOp, tokenQuote } = await paymaster.createTokenPaymasterUserOperation(
+    // Passing { token } triggers the token-gas flow: the provider is auto-detected
+    // from the paymaster URL, the exchange rate is fetched, the ERC-20 approval is
+    // prepended to callData, and the max token cost is returned in tokenQuote.
+    const { userOperation: tokenOp, tokenQuote } = await paymaster.createPaymasterUserOperation(
         smartAccount,
         userOperation,
-        tokenSelected.address,
         bundlerUrl,
+        { token: tokenAddress },
     )
     userOperation = tokenOp
     const cost = tokenQuote?.tokenCost ?? 0n
-    console.log("Estimated gas cost: " + cost + " wei in " + tokenSelected.symbol)
+    console.log("Estimated gas cost: " + cost + " in the token")
     console.log("Sender account: " + userOperation.sender)
 
     // ──────────────────────────────────────────────────────────────────────

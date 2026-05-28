@@ -2,7 +2,7 @@ import { loadEnv, getOrCreateOwner, requireEnv } from '../utils/env'
 import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     MetaTransaction,
-    CandidePaymaster,
+    Erc7677Paymaster,
     getFunctionSelector,
     createCallData,
 } from "abstractionkit";
@@ -67,41 +67,25 @@ async function main(): Promise<void> {
         }
     )
 
-    const paymaster = new CandidePaymaster(paymasterUrl)
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
 
-    const tokensSupported = await paymaster.fetchSupportedERC20TokensAndPaymasterMetadata(SafeAccount.DEFAULT_ENTRYPOINT_ADDRESS);
-    const tokenSelected = tokensSupported.tokens.find(token => token.address.toLocaleLowerCase() === paymasterTokenAddress.toLowerCase());
-
-    console.log("This example uses Candide Token Paymaster");
+    console.log("This example pays gas in an ERC-20 token via an ERC-7677 paymaster");
     console.log("Please visit https://dashboard.candide.dev/ to get a Paymaster URL");
     console.log("Get test tokens from our faucet https://dashboard.candide.dev/faucet");
 
-    if (tokenSelected) {
-        // v0.3.3+: createTokenPaymasterUserOperation returns the maximum
-        // token cost (`tokenQuote.tokenCost`) and exchange rate alongside
-        // the UserOperation, so a separate `calculateUserOperationErc20TokenMaxGasCost`
-        // round-trip is no longer needed for cost display.
-        const { userOperation: tokenOp, tokenQuote } = await paymaster.createTokenPaymasterUserOperation(
-            smartAccount,
-            userOperation,
-            tokenSelected.address,
-            bundlerUrl,
-            undefined, // context
-            {
-                // Bumps default verificationGasLimit headroom from 10% to 20%.
-                // Some bundlers require verificationGasLimit >= used + 2000;
-                // the default sometimes lands within that buffer ("has only -1277").
-                // verificationGasLimitPercentageMultiplier: 20,
-            },
-        )
-        userOperation = tokenOp
-        const cost = tokenQuote?.tokenCost ?? 0n
-        console.log("This useroperation may cost upto : " + cost + " wei in CTT token")
-        console.log(
-            "Please fund the sender account : " +
-            userOperation.sender +
-            " with more than " + cost + " wei CTT token"
-        )
+    // Passing { token } triggers the token-gas flow: the provider is auto-detected
+    // from the paymaster URL, the exchange rate is fetched, the ERC-20 approval is
+    // prepended to callData, and the max token cost is returned in tokenQuote.
+    const { userOperation: tokenOp, tokenQuote } = await paymaster.createPaymasterUserOperation(
+        smartAccount,
+        userOperation,
+        bundlerUrl,
+        { token: paymasterTokenAddress },
+    )
+    userOperation = tokenOp
+    if (tokenQuote) {
+        console.log("This useroperation may cost upto : " + tokenQuote.tokenCost + " of the token (exchange rate: " + tokenQuote.exchangeRate + ")")
+        console.log("Fund the sender account : " + userOperation.sender + " with at least " + tokenQuote.tokenCost + " of the token")
     }
 
     //Safe is a multisig that can have multiple owners/signers
