@@ -6,15 +6,13 @@ import {
     CandidePaymaster,
     getFunctionSelector,
     createCallData,
+    sendJsonRpcRequest,
 } from "abstractionkit"
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Migrate a DEPLOYED Safe smart account from EntryPoint v0.7 to EntryPoint v0.9
 // (the "0.3.0 module" Safe → the multi-chain-signature module), gas-sponsored.
 // ─────────────────────────────────────────────────────────────────────────────
-//
-// Account classes involved (abstractionkit has no Safe class for EntryPoint v0.8;
-// the SDK-supported pre-v0.9 Safe is the v0.3.0-module account on EntryPoint v0.7):
 //
 //   SafeAccountV0_3_0           → EntryPoint v0.7, Safe4337Module
 //                                 0x75cf11467937ce3F2f357CE24ffc3DBF8fD5c226
@@ -43,17 +41,16 @@ import {
 // The migration batch is validated and executed by the OLD (v0.7) module on the
 // OLD EntryPoint. Disabling the module that is mid-execution is safe: validation
 // has already completed and the EntryPoint will not re-enter the module for this
-// op. This is exactly how the SDK's own v0.6→v0.7 migration helper works; there is
-// no built-in v0.9 helper, so the three MetaTransactions are composed below.
+// op.
 //
-// This script is self-contained and runs three phases on Arbitrum Sepolia:
-//   Phase 1 — deploy a fresh SafeAccountV0_3_0 (EP v0.7)        [sponsored]
+// This script is self-contained and runs three phases:
+//   Phase 1 — deploy a fresh SafeAccountV0_3_0 (EP v0.7)          [sponsored]
 //   Phase 2 — migrate it to the v0.9 multi-chain module (EP v0.9) [sponsored]
 //   Phase 3 — prove the upgraded account works on EP v0.9 (mint)  [sponsored]
 //
 // (You could fuse Phase 1 + Phase 2 into a single deploy-and-migrate op — the
 //  deploy initCode sets the v0.7 module, and that op's callData carries the
-//  migration batch. Kept separate here so each state is observable on-chain.)
+//  migration batch. Kept separate here so each state is observable onchain.)
 
 const OLD_MODULE = SafeAccountV0_3_0.DEFAULT_SAFE_4337_MODULE_ADDRESS // EP v0.7 module
 const NEW_MODULE = SafeMultiChainSigAccountV1.DEFAULT_SAFE_4337_MODULE_ADDRESS // EP v0.9 module
@@ -63,19 +60,10 @@ const NEW_MODULE = SafeMultiChainSigAccountV1.DEFAULT_SAFE_4337_MODULE_ADDRESS /
 const FALLBACK_HANDLER_SLOT =
     "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5"
 
-const EXPLORER = "https://sepolia.arbiscan.io"
-
 /**
  * Compose the three MetaTransactions that move a deployed Safe from the v0.7
- * module to the v0.9 multi-chain-signature module. Mirrors the SDK's existing
- * createMigrateToSafeAccountV0_3_0MetaTransactions (v0.6 → v0.7), retargeted to
- * the v0.9 module. No storage clearing step exists because neither module keeps
- * per-account storage.
- *
- * Spelled out here so the migration is fully visible. Newer abstractionkit
- * releases also expose this directly:
- *   oldAccount.createMigrateToSafeMultiChainSigAccountV1MetaTransactions(nodeUrl)
- * and a generic SafeAccount.createModuleMigrationMetaTransactions(nodeUrl, from, to).
+ * module to the v0.9 multi-chain-signature module. No storage clearing step exists 
+ * because neither module keeps per-account storage.
  */
 async function createMigrateToV09MetaTransactions(
     oldAccount: SafeAccountV0_3_0,
@@ -107,21 +95,10 @@ async function createMigrateToV09MetaTransactions(
     return [disableOldModule, enableNewModule, setFallbackHandler]
 }
 
-/** Read a single storage slot via raw JSON-RPC. */
+/** Read a single storage slot via the SDK's JSON-RPC helper. */
 async function getStorageAt(nodeUrl: string, address: string, slot: string): Promise<string> {
-    const res = await fetch(nodeUrl, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-            jsonrpc: "2.0",
-            id: 1,
-            method: "eth_getStorageAt",
-            params: [address, slot, "latest"],
-        }),
-    })
-    const json = await res.json()
-    if (json.error) throw new Error(`eth_getStorageAt failed: ${json.error.message}`)
-    return json.result as string
+    const result = await sendJsonRpcRequest(nodeUrl, "eth_getStorageAt", [address, slot, "latest"])
+    return result as string
 }
 
 /** Last 20 bytes of a 32-byte storage word, as a checksummable lowercase address. */
@@ -150,7 +127,6 @@ async function main(): Promise<void> {
     const accountAddress = oldAccount.accountAddress
     console.log("──────────────────────────────────────────────")
     console.log(`Safe account address: ${accountAddress}`)
-    console.log(`  Explorer: ${EXPLORER}/address/${accountAddress}`)
     console.log(`Phase 1: deploying Safe on EntryPoint v0.7 (module ${OLD_MODULE})`)
 
     let deployOp = await oldAccount.createUserOperation([noOp], nodeUrl, bundlerUrl)
@@ -168,7 +144,7 @@ async function main(): Promise<void> {
     if (deployReceipt == null || !deployReceipt.success) {
         throw new Error("Phase 1 failed — Safe deployment UserOperation was not included successfully.")
     }
-    console.log(`Phase 1 included: ${EXPLORER}/tx/${deployReceipt.receipt.transactionHash}`)
+    console.log(`Phase 1 included: ${deployReceipt.receipt.transactionHash}`)
 
     // Sanity check: the v0.7 module is the active module on the fresh Safe.
     if (!(await oldAccount.isModuleEnabled(nodeUrl, OLD_MODULE))) {
@@ -196,7 +172,7 @@ async function main(): Promise<void> {
     if (migrateReceipt == null || !migrateReceipt.success) {
         throw new Error("Phase 2 failed — migration UserOperation was not included successfully.")
     }
-    console.log(`Phase 2 included: ${EXPLORER}/tx/${migrateReceipt.receipt.transactionHash}`)
+    console.log(`Phase 2 included: ${migrateReceipt.receipt.transactionHash}`)
 
     // ── Verify the on-chain upgrade (independent of "the tx didn't revert") ──
     const newModuleEnabled = await oldAccount.isModuleEnabled(nodeUrl, NEW_MODULE)
@@ -248,11 +224,11 @@ async function main(): Promise<void> {
     if (mintReceipt == null || !mintReceipt.success) {
         throw new Error("Phase 3 failed — the upgraded v0.9 account could not execute a UserOperation.")
     }
-    console.log(`Phase 3 included: ${EXPLORER}/tx/${mintReceipt.receipt.transactionHash}`)
+    console.log(`Phase 3 included: ${mintReceipt.receipt.transactionHash}`)
 
     console.log("──────────────────────────────────────────────")
     console.log("Migration complete: Safe upgraded from EntryPoint v0.7 to v0.9, fully sponsored.")
-    console.log(`  Account: ${EXPLORER}/address/${accountAddress}`)
+    console.log(`  Account: ${accountAddress}`)
 }
 
 main().catch((err) => {
