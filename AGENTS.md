@@ -56,6 +56,7 @@ npx ts-node <folder>/<script>.ts
 | Pay gas with ERC-20 | `pay-gas-in-erc20/` | `pay-gas-in-erc20.ts` |
 | Batch multiple txs | `batch-transactions/` | `batch-transactions.ts` |
 | Account recovery | `recovery/` | `recovery.ts` |
+| Upgrade a deployed Safe EntryPoint v0.7 → v0.9 (swap 4337 module + fallback handler, sponsored) | `migrate-safe-v07-to-v09/` | `migrate-safe-v07-to-v09.ts` |
 | EIP-7702 delegation (EntryPoint v0.9) | `eip-7702/simple-account/` | `01-upgrade-eoa.ts` |
 | EIP-7702 pay gas in ERC-20 | `eip-7702/simple-account/` | `02-upgrade-eoa-erc20-gas.ts` |
 | EIP-7702 two-phase parallel signing (sponsor latency optimization) | `eip-7702/simple-account/` | `03-parallel-signing.ts` |
@@ -212,6 +213,32 @@ const receipt = await response.included();
 | `Simple7702Account` | EIP-7702 legacy v0.8 (used in the v0.8→v0.9 migration example) | v0.8 | `signUserOperationWithSigner(op, signer, chainId)` |
 | `Calibur7702Account` | EIP-7702 Calibur (passkeys, key mgmt) | v0.8 (default) | `signUserOperationWithSigner(op, signer, chainId)` |
 
+> **Module version ≠ EntryPoint version.** The Safe class names refer to the Safe
+> *4337 module* version, not the EntryPoint. `SafeAccountV0_3_0` is the "0.3.0
+> module" Safe and runs on **EntryPoint v0.7** (not v0.8); `SafeAccountV0_2_0` is
+> the "0.2.0 module" on **EntryPoint v0.6**. There is no Safe class for EntryPoint
+> v0.8 — the SDK jumps from the v0.7 Safe straight to `SafeMultiChainSigAccountV1`
+> on **v0.9**. See the `EntryPoint` column above for the authoritative mapping.
+
+## Paymaster Patterns
+
+**Recommended: `Erc7677Paymaster`** — it speaks the ERC-7677 standard, so it works
+with any compliant provider (Candide, Pimlico, Alchemy) and is portable. Sponsor in
+a single call: `createPaymasterUserOperation(account, op, bundlerUrl, context)`. Used
+by `sponsor-gas/`.
+
+`CandidePaymaster` is the Candide-specific client (sponsorship + ERC-20 gas). It also
+sponsors in a **single** call — `createSponsorPaymasterUserOperation(...)` — on every
+EntryPoint, including v0.9. The two-phase `commit` → sign → `finalize` flow seen in
+some examples is an **optional latency optimization** (sign in parallel with the
+paymaster's final-data fetch; see `eip-7702/simple-account/03-parallel-signing.ts`),
+**not** a requirement for v0.9.
+
+The v0.9 `commit`/`finalize` split lets you sign in parallel with the paymaster's
+final-data fetch to cut latency; it is the established pattern for `CandidePaymaster`
+on EntryPoint v0.9. The single-call `Erc7677Paymaster` path also works on v0.9 when
+you don't need that optimization.
+
 ## Common Commands
 
 ```bash
@@ -220,6 +247,9 @@ npm install
 
 # Run an example
 npx ts-node sponsor-gas/sponsor-gas.ts
+
+# Type-check every example against the installed abstractionkit (no emit)
+npm run check
 
 # Build TypeScript
 npm run build
