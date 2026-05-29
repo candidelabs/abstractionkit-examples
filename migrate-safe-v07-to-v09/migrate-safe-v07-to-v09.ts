@@ -3,7 +3,7 @@ import {
     SafeAccountV0_3_0,
     SafeMultiChainSigAccountV1,
     MetaTransaction,
-    CandidePaymaster,
+    Erc7677Paymaster,
     getFunctionSelector,
     createCallData,
     sendJsonRpcRequest,
@@ -62,7 +62,7 @@ const FALLBACK_HANDLER_SLOT =
 
 /**
  * Compose the three MetaTransactions that move a deployed Safe from the v0.7
- * module to the v0.9 multi-chain-signature module. No storage clearing step exists 
+ * module to the v0.9 multi-chain-signature module. No storage clearing step exists
  * because neither module keeps per-account storage.
  */
 async function createMigrateToV09MetaTransactions(
@@ -95,12 +95,6 @@ async function createMigrateToV09MetaTransactions(
     return [disableOldModule, enableNewModule, setFallbackHandler]
 }
 
-/** Read a single storage slot via the SDK's JSON-RPC helper. */
-async function getStorageAt(nodeUrl: string, address: string, slot: string): Promise<string> {
-    const result = await sendJsonRpcRequest(nodeUrl, "eth_getStorageAt", [address, slot, "latest"])
-    return result as string
-}
-
 /** Last 20 bytes of a 32-byte storage word, as a checksummable lowercase address. */
 function slotToAddress(word: string): string {
     return "0x" + word.slice(-40).toLowerCase()
@@ -110,7 +104,10 @@ async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
     const { publicAddress: ownerPublicAddress, privateKey: ownerPrivateKey } = getOrCreateOwner()
 
-    const paymaster = new CandidePaymaster(paymasterUrl)
+    const paymaster = new Erc7677Paymaster(paymasterUrl)
+    // Candide and Pimlico read `sponsorshipPolicyId`; Alchemy reads `policyId`.
+    // Send both so the same context is portable across providers; empty = public gas policies.
+    const context = sponsorshipPolicyId ? { sponsorshipPolicyId, policyId: sponsorshipPolicyId } : {}
 
     // No-op self-call: Phase 1 only needs to DEPLOY the Safe; it does nothing else.
     const noOp: MetaTransaction = { to: ownerPublicAddress, value: 0n, data: "0x" }
@@ -131,10 +128,10 @@ async function main(): Promise<void> {
 
     let deployOp = await oldAccount.createUserOperation([noOp], nodeUrl, bundlerUrl)
 
-    // EntryPoint v0.7 + CandidePaymaster: single-phase sponsorship.
+    // Single ERC-7677 sponsorship call — works on every EntryPoint, v0.7 included.
     deployOp = (
-        await paymaster.createSponsorPaymasterUserOperation(
-            oldAccount, deployOp, bundlerUrl, sponsorshipPolicyId,
+        await paymaster.createPaymasterUserOperation(
+            oldAccount, deployOp, bundlerUrl, context
         )
     ).userOperation
 
@@ -161,8 +158,8 @@ async function main(): Promise<void> {
     let migrateOp = await oldAccount.createUserOperation(migrationBatch, nodeUrl, bundlerUrl)
 
     migrateOp = (
-        await paymaster.createSponsorPaymasterUserOperation(
-            oldAccount, migrateOp, bundlerUrl, sponsorshipPolicyId,
+        await paymaster.createPaymasterUserOperation(
+            oldAccount, migrateOp, bundlerUrl, context
         )
     ).userOperation
 
@@ -178,7 +175,7 @@ async function main(): Promise<void> {
     const newModuleEnabled = await oldAccount.isModuleEnabled(nodeUrl, NEW_MODULE)
     const oldModuleEnabled = await oldAccount.isModuleEnabled(nodeUrl, OLD_MODULE)
     const fallbackHandler = slotToAddress(
-        await getStorageAt(nodeUrl, accountAddress, FALLBACK_HANDLER_SLOT),
+        await sendJsonRpcRequest(nodeUrl, "eth_getStorageAt", [accountAddress, FALLBACK_HANDLER_SLOT, "latest"]) as string,
     )
 
     console.log("Upgrade verification:")
@@ -209,12 +206,9 @@ async function main(): Promise<void> {
 
     let mintOp = await newAccount.createUserOperation([mintTx], nodeUrl, bundlerUrl)
 
-    // Single-call sponsorship works on every EntryPoint, including v0.9. (The
-    // commit/finalize split in 03-parallel-signing.ts is an optional latency
-    // optimization, not a requirement.)
     mintOp = (
-        await paymaster.createSponsorPaymasterUserOperation(
-            newAccount, mintOp, bundlerUrl, sponsorshipPolicyId,
+        await paymaster.createPaymasterUserOperation(
+            newAccount, mintOp, bundlerUrl, context
         )
     ).userOperation
 
