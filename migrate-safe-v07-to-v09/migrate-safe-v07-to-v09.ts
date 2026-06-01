@@ -151,6 +151,14 @@ async function main(): Promise<void> {
     // ═════════════════════════════════════════════════════════════════════════
     // Phase 2 — Migrate to the v0.9 multi-chain module (validated by v0.7 module)
     // ═════════════════════════════════════════════════════════════════════════
+    // We deployed this Safe ourselves above, so we know it's a v0.7 Safe-4337
+    // account. When migrating an account you did NOT just deploy, preflight it
+    // first: confirm the old module is enabled AND is the current fallback handler
+    // (oldAccount.isModuleEnabled(...) + the fallback-handler read below) before
+    // building the batch — otherwise the migration UserOp fails validation on the
+    // v0.7 EntryPoint with an opaque AA23/AA24. (abstractionkit > 0.3.8's
+    // createMigrateToSafeMultiChainSigAccountV1MetaTransactions runs this preflight
+    // for you; pass { skipPreflight: true } to opt out.)
     console.log(`Phase 2: migrating to EntryPoint v0.9 (module ${NEW_MODULE})`)
 
     const migrationBatch = await createMigrateToV09MetaTransactions(oldAccount, nodeUrl)
