@@ -23,8 +23,12 @@ async function main(): Promise<void> {
 
     const tx: MetaTransaction = { to: account.accountAddress, value: 0n, data: '0x' }
 
-    // Attempt 1: deliberately underpriced (1 wei gas price).
+    // Attempt 1: deliberately underpriced (1 wei gas price). Only retry if the
+    // failure classifies as retriable, whichever way it surfaces: a thrown error
+    // (the usual case for an underpriced op), a mined success:false receipt, or a
+    // null receipt (accepted but not bundled in time).
     console.log('Attempt 1: sending with maxFeePerGas = 1 wei (too low on purpose)...')
+    let retriable = false
     try {
         const op = await account.createUserOperation([tx], nodeUrl, bundlerUrl, {
             maxFeePerGas: 1n,
@@ -34,22 +38,31 @@ async function main(): Promise<void> {
         const resp = await account.sendUserOperation(op, bundlerUrl)
         const receipt = await resp.included()
         if (receipt?.success) {
-            console.log('Unexpected: the underpriced op was accepted; nothing to retry.')
+            console.log('  unexpected: the underpriced op was accepted; nothing to retry.')
             return
+        }
+        if (receipt) {
+            const failure = classifyUserOpFailure(receipt)
+            console.log(`  mined but failed (${failure.category}): ${failure.suggestedAction}`)
+            retriable = failure.isRetriable
+        } else {
+            console.log('  no receipt within the timeout; not retrying in this demo.')
         }
     } catch (err) {
         const failure = classifyUserOpFailure(err)
         console.log(`  rejected (${failure.category}): ${failure.suggestedAction}`)
-        if (!failure.isRetriable) {
-            console.log('  not retriable, stopping.')
-            return
-        }
+        retriable = failure.isRetriable
     }
 
-    // Attempt 2: it was retriable, so rebuild with current gas and resend.
+    if (!retriable) {
+        console.log('  not retriable, stopping.')
+        return
+    }
+
+    // Attempt 2: the failure was retriable, so rebuild with current gas and resend.
     // createUserOperation with no fee override refetches the current gas price and
     // re-estimates the limits, which is exactly the fix for a gas failure.
-    console.log('\nAttempt 2: retriable -> rebuilding with current gas and resending...')
+    console.log('\nAttempt 2: rebuilding with current gas and resending...')
     const retryOp = await account.createUserOperation([tx], nodeUrl, bundlerUrl)
     retryOp.signature = account.signUserOperation(retryOp, [privateKey], chainId)
     const retryReceipt = await (await account.sendUserOperation(retryOp, bundlerUrl)).included()

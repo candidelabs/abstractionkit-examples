@@ -1,4 +1,5 @@
 import { UserOperationReceiptResult } from 'abstractionkit'
+import { decodeUserOpRevertReason } from './decodeUserOpRevertReason'
 
 export type UserOpFailure = {
     category:
@@ -36,7 +37,7 @@ const AA_CODES: Record<string, Verdict> = {
     AA33: ['sponsorship-denied', false, 'Paymaster validation failed. Check the paymaster or pay gas another way.'],
     AA40: ['gas-limit-too-low', true, 'Verification used more gas than its limit. Re-estimate gas and retry.'],
     AA41: ['gas-limit-too-low', true, 'verificationGasLimit was too low. Re-estimate gas and retry.'],
-    AA13: ['gas-limit-too-low', true, 'Account deployment ran out of gas, or the factory reverted. Re-estimate gas and retry.'],
+    AA13: ['gas-limit-too-low', true, 'Account deployment failed (factory reverted or ran out of gas). Re-estimate gas and retry; if it persists, the factory rejected the inputs.'],
     AA23: ['gas-limit-too-low', true, 'Validation ran out of gas or was rejected. Re-estimate gas and retry; if it persists, re-sign the op.'],
 }
 
@@ -71,13 +72,23 @@ const REVERT_ACTION =
  * -32602). Those keywords are best-effort and tuned for Candide.
  */
 export function classifyUserOpFailure(input: unknown): UserOpFailure {
-    // Execution stage: a mined receipt that reverted.
+    // Execution stage: a mined receipt that reverted. Decode the revert reason
+    // (no extra RPC, the logs are in the receipt) so the verdict can tell a
+    // retriable out-of-gas from a hard revert. Out-of-gas is a heuristic here
+    // (empty revert data is usually OOG, sometimes a bare revert()), and the op
+    // already mined, so the retry is a NEW op at the next nonce, not a resend.
     if (typeof input === 'object' && input !== null && 'success' in input) {
         const receipt = input as NonNullable<UserOperationReceiptResult>
         if (!receipt.success) {
+            const reason = `success=false tx=${receipt.receipt.transactionHash}`
+            const revert = decodeUserOpRevertReason(receipt)
+            if (revert.outOfGas) {
+                return toFailure(['execution-reverted', true,
+                    'Ran out of gas during execution. Raise callGasLimit and send a new op (this one mined, so its nonce is used).'], reason)
+            }
+            const detail = revert.errorMessage ? `: ${revert.errorMessage}` : ''
             return toFailure(['execution-reverted', false,
-                'Included on-chain but the call reverted. Use decodeUserOpRevertReason(receipt) to read why.'],
-                `success=false tx=${receipt.receipt.transactionHash}`)
+                `Included on-chain but the call reverted${detail}. Fix the call; retrying as-is will not help.`], reason)
         }
     }
 

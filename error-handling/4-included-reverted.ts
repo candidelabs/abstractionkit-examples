@@ -69,20 +69,18 @@ async function main(): Promise<void> {
         } else if (receipt.success) {
             console.log('Unexpected: the op succeeded, so the transfer did not revert.')
         } else {
+            // The classifier decodes the receipt to set its verdict, so its
+            // isRetriable and suggestedAction already reflect out-of-gas vs a hard
+            // revert. Call decodeUserOpRevertReason directly when you want the raw
+            // reason as well.
             const failure = classifyUserOpFailure(receipt)
             console.log('UserOperation was included but reverted:')
             console.log(failure)
 
-            // Why did it revert? Decode the EntryPoint's UserOperationRevertReason
-            // log straight from the receipt.
             const revert = decodeUserOpRevertReason(receipt)
-            console.log('\nRevert detail:', revert)
-            if (revert.outOfGas) {
-                console.log('Empty revert data, so most likely out of gas. Raise callGasLimit and')
-                console.log('resubmit as a new op (this one mined, so its nonce is already used).')
-            } else if (revert.errorMessage) {
-                console.log(`Reverted with reason "${revert.errorMessage}", a deliberate revert rather than gas.`)
-            }
+            if (revert.errorMessage) console.log('\nRevert reason:', revert.errorMessage)
+            else if (revert.outOfGas) console.log('\nNo revert data: most likely out of gas.')
+
             console.log('\nSuggested wallet action:', failure.suggestedAction)
             console.log('tx:', receipt.receipt.transactionHash)
         }
