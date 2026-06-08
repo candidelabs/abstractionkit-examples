@@ -47,7 +47,18 @@ function gatherLogs(receipt: NonNullable<UserOperationReceiptResult>): any[] {
 export function decodeUserOpRevertReason(receipt: NonNullable<UserOperationReceiptResult>): UserOpRevert {
     if (receipt.success) return { reverted: false, outOfGas: false, rawRevertReason: '0x' }
 
-    const log = gatherLogs(receipt).find((l) => l?.topics?.[0]?.toLowerCase() === REVERT_REASON_TOPIC)
+    // UserOperationRevertReason is indexed by userOpHash (topic[1]). A bundle can
+    // contain several reverted ops, so match this op's hash as well as the event
+    // topic; otherwise we could pick up another op's revert reason from the bundle
+    // logs. The guard keeps it working for a receipt without the top-level hash.
+    // (Inner-call logs of this op do not carry the hash and would need locating by
+    // logIndex range, which is out of scope here.)
+    const userOpHash = (receipt as { userOpHash?: string }).userOpHash?.toLowerCase()
+    const log = gatherLogs(receipt).find(
+        (l) =>
+            l?.topics?.[0]?.toLowerCase() === REVERT_REASON_TOPIC &&
+            (userOpHash == null || l?.topics?.[1]?.toLowerCase() === userOpHash),
+    )
     if (!log) return { reverted: true, outOfGas: false, rawRevertReason: '0x' }
 
     // data = abi.encode(uint256 nonce, bytes revertReason)
