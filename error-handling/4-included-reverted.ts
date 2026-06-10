@@ -4,9 +4,9 @@ import {
     MetaTransaction,
     getFunctionSelector,
     createCallData,
+    decodeUserOperationRevertReason,
 } from 'abstractionkit'
 import { classifyUserOpFailure } from './classifyUserOpFailure'
-import { decodeUserOpRevertReason } from './decodeUserOpRevertReason'
 
 /**
  * Reach the execution stage and fail there (success:false).
@@ -71,13 +71,13 @@ async function main(): Promise<void> {
         } else {
             // The classifier decodes the receipt to set its verdict, so its
             // isRetriable and suggestedAction already reflect out-of-gas vs a hard
-            // revert. Call decodeUserOpRevertReason directly when you want the raw
-            // reason as well.
+            // revert. Call abstractionkit's decodeUserOperationRevertReason directly
+            // when you want the raw reason as well.
             const failure = classifyUserOpFailure(receipt)
             console.log('UserOperation was included but reverted:')
             console.log(failure)
 
-            const revert = decodeUserOpRevertReason(receipt)
+            const revert = decodeUserOperationRevertReason(receipt)
             if (revert.errorMessage) console.log('\nRevert reason:', revert.errorMessage)
             else if (revert.outOfGas) console.log('\nNo revert data: most likely out of gas.')
 

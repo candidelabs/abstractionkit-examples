@@ -42,7 +42,7 @@ async function main(): Promise<void> {
             project: 'AbstractionKit Examples',
             platform: 'Web',
             tool: 'abstractionkit',
-            toolVersion: '0.3.2',
+            toolVersion: '0.4.0',
         },
     })
 

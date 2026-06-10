@@ -41,6 +41,9 @@ function buildCustomSigner(privateKey: `0x${string}`): ExternalSigner {
 
     return {
         address: account.address,
+        // Since abstractionkit 0.4.0 these may also return the hex signature
+        // synchronously (Hex | Promise<Hex>) — a local-key signer doesn't need
+        // to wrap its result in a Promise.
         signHash: async (hash) => account.sign({ hash }),
         // signTypedData: async (data) => yourDevice.signTypedData(data),
     }

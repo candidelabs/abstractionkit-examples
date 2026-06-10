@@ -72,6 +72,7 @@ npx ts-node <folder>/<script>.ts
 | Nested Safe accounts | `nested-safe-accounts/` | `nested-safe-accounts.ts` |
 | Spending limits | `spend-permission/` | `spend-permission.ts` |
 | Track active users / userOps on-chain | `onchain-identifier/` | `onchain-identifier.ts` |
+| Classify UserOperation failures / decode revert reasons | `error-handling/` | `classifyUserOpFailure.ts` |
 | Calibur 7702 upgrade EOA + gas sponsorship | `eip-7702/calibur-account/` | `01-upgrade-eoa.ts` |
 | Calibur 7702 passkeys | `eip-7702/calibur-account/` | `02-passkeys.ts` |
 | Calibur 7702 key management | `eip-7702/calibur-account/` | `03-manage-keys.ts` |
@@ -117,6 +118,13 @@ For production endpoints: https://dashboard.candide.dev
 
 ## Common Errors & Solutions
 
+To handle failures in code rather than by eye, see `error-handling/`. Since
+abstractionkit 0.4.0 the SDK does the parsing for you: a thrown
+`AbstractionKitError` carries the EntryPoint code as `err.aaCode` (e.g. `"AA21"`;
+`parseAaCode(message)` is exported for errors from other sources), and
+`decodeUserOperationRevertReason(receipt)` decodes a mined-but-failed op's revert
+reason from the receipt with no extra RPC call.
+
 ### "AA21 didn't pay prefund"
 Account has insufficient ETH and no paymaster is sponsoring.
 **Fix:** Use the `sponsor-gas/` example with the public paymaster, or fund the smart account address.
@@ -157,11 +165,11 @@ Three built-in adapters cover the common cases:
 | `fromEthersWallet(wallet)` | Any `ethers.Wallet` / `HDNodeWallet` |
 | `fromViemWalletClient(client)` | `viem` `WalletClient` (typed-data only; no multi-op) |
 
-For HSM / MPC / hardware wallets, pass an inline object matching `ExternalSigner`: `{ address, signHash?(hash): Promise<hex>, signTypedData?(data): Promise<hex> }`. At least one of `signHash` or `signTypedData` is required (compile-time check).
+For HSM / MPC / hardware wallets, pass an inline object matching `ExternalSigner`: `{ address, signHash?(hash), signTypedData?(data) }`, where each function returns the hex signature or a Promise of it (sync returns allowed since 0.4.0). At least one of `signHash` or `signTypedData` is required (compile-time check).
 
 If all you have is a raw 0x-hex private key, the shortest path is the legacy sync API: `safe.signUserOperation(userOp, [privateKey], chainId)`. A `fromPrivateKey(pk)` adapter is also exported for multi-owner setups where pk and HSM owners need to flow through the same async interface.
 
-Signing is async. Capability mismatches (e.g. a typed-data-only signer against a hash-only account) throw offline with an actionable message, so no HSM / hardware prompt fires on a trip that would fail anyway.
+The `signUserOperationWithSigner(s)` entry points are async (signer functions themselves may return synchronously). Capability mismatches (e.g. a typed-data-only signer against a hash-only account) throw offline with an actionable message, so no HSM / hardware prompt fires on a trip that would fail anyway.
 
 Canonical per-adapter examples: `signer/`. Account-specific starters for the flows that differ from the standard Safe-sponsored flow: `eip-7702/*/0X-external-signer*.ts`, `chain-abstraction/add-owner-with-external-signer.ts`.
 
@@ -201,6 +209,10 @@ userOp.signature = smartAccount.signUserOperation(userOp, [privateKey], chainId)
 const response = await smartAccount.sendUserOperation(userOp, bundlerUrl);
 const receipt = await response.included();
 ```
+
+Since abstractionkit 0.4.0, `receipt.logs` (and `receipt.receipt.logs`) are
+structured `Log[]` arrays — do not `JSON.parse` them (they were JSON-encoded
+strings in 0.3.x and earlier).
 
 ## Account Types
 

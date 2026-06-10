@@ -5,10 +5,10 @@ account, bump the gas, re-sign, or just tell the user it didn't go through.
 
 Two helpers do the work:
 
-- `classifyUserOpFailure(errorOrReceipt)` turns a failure into an actionable
-  verdict: `{ category, isRetriable, suggestedAction, aaCode?, reason }`.
-- `decodeUserOpRevertReason(receipt)` reads the on-chain revert reason out of a
-  mined-but-failed receipt.
+- `classifyUserOpFailure(errorOrReceipt)` (in this folder) turns a failure into an
+  actionable verdict: `{ category, isRetriable, suggestedAction, aaCode?, reason }`.
+- `decodeUserOperationRevertReason(receipt)` (exported by abstractionkit since
+  0.4.0) reads the on-chain revert reason out of a mined-but-failed receipt.
 
 Each of the five scripts triggers one real failure on a live testnet and runs it
 through the classifier.
@@ -57,8 +57,8 @@ try {
 
   if (receipt && !receipt.success) {
     // Mined, but the call reverted.
-    const failure = classifyUserOpFailure(receipt)   // { category: 'execution-reverted', ... }
-    const revert = decodeUserOpRevertReason(receipt) // { outOfGas, errorMessage, ... }
+    const failure = classifyUserOpFailure(receipt)           // { category: 'execution-reverted', ... }
+    const revert = decodeUserOperationRevertReason(receipt)  // { outOfGas, errorMessage, ... }
   }
 } catch (err) {
   // Rejected before inclusion.
@@ -91,15 +91,18 @@ The classifier trusts codes before wording, because codes are stable and message
 are not: the error `code` (`BUNDLER_ERROR` vs `PAYMASTER_ERROR`) and `cause.code`
 first, then the EntryPoint `AAxx` code, and only then keyword matching for the two
 cases no code pins down (token vs sponsor, both `-32003`; fee and gas-limit errors,
-`-32602`). Those keyword strings are tuned for Candide, so swap them for another
-provider.
+`-32602`). Since abstractionkit 0.4.0 the `AAxx` code arrives pre-parsed on a thrown
+`AbstractionKitError` as `err.aaCode`, with the exported `parseAaCode(message)` as a
+fallback for errors from other sources. Those keyword strings are tuned for Candide,
+so swap them for another provider.
 
 ## Out-of-gas vs revert
 
 A `success: false` receipt does not say whether the call ran out of gas or reverted
-on purpose. `decodeUserOpRevertReason` reads the EntryPoint's
+on purpose. abstractionkit's `decodeUserOperationRevertReason` reads the EntryPoint's
 `UserOperationRevertReason` log from the receipt you already have, with no extra RPC
-call, and returns the reason: a string for `revert("...")`, a panic code for
+call, matches the receipt's `userOpHash` (so multi-op bundles return the right
+entry), and returns the reason: a string for `revert("...")`, a panic code for
 `assert`, or empty data, which usually means out-of-gas (so it reports
 `outOfGas: true`). For certainty about out-of-gas, trace the bundle transaction with
 `debug_traceTransaction` or Tenderly, which is a one-off debugging step rather than
