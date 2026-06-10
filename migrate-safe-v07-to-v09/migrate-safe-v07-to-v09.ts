@@ -6,7 +6,6 @@ import {
     Erc7677Paymaster,
     getFunctionSelector,
     createCallData,
-    sendJsonRpcRequest,
 } from "abstractionkit"
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,6 +28,9 @@ import {
 //     3. setFallbackHandler(newModule)
 //   After these land, the Safe validates/executes through the new module on the
 //   new EntryPoint. The Safe singleton (master copy) does NOT change.
+//
+//   Since abstractionkit 0.4.0, the SDK composes this exact batch for you:
+//   oldAccount.createMigrateToSafeMultiChainSigAccountV1MetaTransactions(nodeUrl).
 //
 // STORAGE CLEARING — none required.
 //   Both Safe4337Module (v0.7) and Safe4337MultiChainSignatureModule (v0.9) are
@@ -55,49 +57,17 @@ import {
 const OLD_MODULE = SafeAccountV0_3_0.DEFAULT_SAFE_4337_MODULE_ADDRESS // EP v0.7 module
 const NEW_MODULE = SafeMultiChainSigAccountV1.DEFAULT_SAFE_4337_MODULE_ADDRESS // EP v0.9 module
 
-// Safe stores its fallback handler at a fixed slot:
-//   keccak256("fallback_manager.handler.address")
-const FALLBACK_HANDLER_SLOT =
-    "0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d5"
-
 /**
- * Compose the three MetaTransactions that move a deployed Safe from the v0.7
- * module to the v0.9 multi-chain-signature module. No storage clearing step exists
- * because neither module keeps per-account storage.
+ * Poll an on-chain read until it returns true. The public RPC is load-balanced,
+ * so a just-mined state change is not always visible to the next request; a read
+ * can also throw while a backend has not seen the deployment yet.
  */
-async function createMigrateToV09MetaTransactions(
-    oldAccount: SafeAccountV0_3_0,
-    nodeUrl: string,
-): Promise<MetaTransaction[]> {
-    // Fetches the previous module in the Safe's linked list automatically
-    // (the 0x..01 sentinel for a Safe that only has the old 4337 module enabled).
-    const disableOldModule = await oldAccount.createDisableModuleMetaTransaction(
-        nodeUrl,
-        OLD_MODULE,
-        oldAccount.accountAddress,
-    )
-
-    const enableNewModule = SafeAccountV0_3_0.createEnableModuleMetaTransaction(
-        NEW_MODULE,
-        oldAccount.accountAddress,
-    )
-
-    const setFallbackHandler: MetaTransaction = {
-        to: oldAccount.accountAddress,
-        value: 0n,
-        data: createCallData(
-            "0xf08a0323", // setFallbackHandler(address)
-            ["address"],
-            [NEW_MODULE],
-        ),
+async function untilTrue(read: () => Promise<boolean>, attempts = 5, delayMs = 3000): Promise<boolean> {
+    for (let i = 0; i < attempts; i++) {
+        try { if (await read()) return true } catch { /* backend lag; retry */ }
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
     }
-
-    return [disableOldModule, enableNewModule, setFallbackHandler]
-}
-
-/** Last 20 bytes of a 32-byte storage word, as a checksummable lowercase address. */
-function slotToAddress(word: string): string {
-    return "0x" + word.slice(-40).toLowerCase()
+    return false
 }
 
 async function main(): Promise<void> {
@@ -144,24 +114,24 @@ async function main(): Promise<void> {
     console.log(`Phase 1 included: ${deployReceipt.receipt.transactionHash}`)
 
     // Sanity check: the v0.7 module is the active module on the fresh Safe.
-    if (!(await oldAccount.isModuleEnabled(nodeUrl, OLD_MODULE))) {
+    if (!(await untilTrue(() => oldAccount.isModuleEnabled(nodeUrl, OLD_MODULE)))) {
         throw new Error("v0.7 module is not enabled after deployment — unexpected state.")
     }
 
     // ═════════════════════════════════════════════════════════════════════════
     // Phase 2 — Migrate to the v0.9 multi-chain module (validated by v0.7 module)
     // ═════════════════════════════════════════════════════════════════════════
-    // We deployed this Safe ourselves above, so we know it's a v0.7 Safe-4337
-    // account. When migrating an account you did NOT just deploy, preflight it
-    // first: confirm the old module is enabled AND is the current fallback handler
-    // (oldAccount.isModuleEnabled(...) + the fallback-handler read below) before
-    // building the batch — otherwise the migration UserOp fails validation on the
-    // v0.7 EntryPoint with an opaque AA23/AA24. (abstractionkit > 0.3.8's
-    // createMigrateToSafeMultiChainSigAccountV1MetaTransactions runs this preflight
-    // for you; pass { skipPreflight: true } to opt out.)
+    // The SDK composes the disableModule + enableModule + setFallbackHandler batch
+    // and, before building it, preflights the account on-chain: the old module must
+    // be enabled AND be the current fallback handler, on a Safe version >= 1.4.1.
+    // Without that check, migrating a wrong-state account fails validation on the
+    // v0.7 EntryPoint with an opaque AA23/AA24; with it, you get a clear error
+    // up front. Pass { skipPreflight: true } to opt out (e.g. for a Safe you just
+    // deployed in the same bundle and the state isn't on-chain yet).
     console.log(`Phase 2: migrating to EntryPoint v0.9 (module ${NEW_MODULE})`)
 
-    const migrationBatch = await createMigrateToV09MetaTransactions(oldAccount, nodeUrl)
+    const migrationBatch =
+        await oldAccount.createMigrateToSafeMultiChainSigAccountV1MetaTransactions(nodeUrl)
 
     let migrateOp = await oldAccount.createUserOperation(migrationBatch, nodeUrl, bundlerUrl)
 
@@ -180,18 +150,23 @@ async function main(): Promise<void> {
     console.log(`Phase 2 included: ${migrateReceipt.receipt.transactionHash}`)
 
     // ── Verify the on-chain upgrade (independent of "the tx didn't revert") ──
-    const newModuleEnabled = await oldAccount.isModuleEnabled(nodeUrl, NEW_MODULE)
-    const oldModuleEnabled = await oldAccount.isModuleEnabled(nodeUrl, OLD_MODULE)
-    const fallbackHandler = slotToAddress(
-        await sendJsonRpcRequest(nodeUrl, "eth_getStorageAt", [accountAddress, FALLBACK_HANDLER_SLOT, "latest"]) as string,
-    )
+    let newModuleEnabled = false
+    let oldModuleEnabled = true
+    let fallbackHandler = ""
+    const upgraded = await untilTrue(async () => {
+        newModuleEnabled = await oldAccount.isModuleEnabled(nodeUrl, NEW_MODULE)
+        oldModuleEnabled = await oldAccount.isModuleEnabled(nodeUrl, OLD_MODULE)
+        // Reads the Safe's fallback-handler storage slot (the active 4337 module).
+        fallbackHandler = (await oldAccount.getFallbackHandler(nodeUrl)).toLowerCase()
+        return newModuleEnabled && !oldModuleEnabled && fallbackHandler === NEW_MODULE.toLowerCase()
+    })
 
     console.log("Upgrade verification:")
     console.log(`  new module (v0.9) enabled:  ${newModuleEnabled}`)
     console.log(`  old module (v0.7) enabled:  ${oldModuleEnabled}`)
     console.log(`  fallback handler is:        ${fallbackHandler}`)
 
-    if (!newModuleEnabled || oldModuleEnabled || fallbackHandler !== NEW_MODULE.toLowerCase()) {
+    if (!upgraded) {
         throw new Error("Upgrade verification failed — account is not cleanly on the v0.9 module.")
     }
 

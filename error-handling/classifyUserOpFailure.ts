@@ -1,5 +1,4 @@
-import { UserOperationReceiptResult } from 'abstractionkit'
-import { decodeUserOpRevertReason } from './decodeUserOpRevertReason'
+import { UserOperationReceiptResult, decodeUserOperationRevertReason, parseAaCode } from 'abstractionkit'
 
 export type UserOpFailure = {
     category:
@@ -81,7 +80,7 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
         const receipt = input as NonNullable<UserOperationReceiptResult>
         if (!receipt.success) {
             const reason = `success=false tx=${receipt.receipt.transactionHash}`
-            const revert = decodeUserOpRevertReason(receipt)
+            const revert = decodeUserOperationRevertReason(receipt)
             if (revert.outOfGas) {
                 return toFailure(['execution-reverted', true,
                     'Ran out of gas during execution. Raise callGasLimit and send a new op (this one mined, so its nonce is used).'], reason)
@@ -93,7 +92,7 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
     }
 
     // A thrown AbstractionKitError (or anything else).
-    const err = input as { code?: string; cause?: { code?: unknown; message?: string }; message?: string } | undefined
+    const err = input as { code?: string; aaCode?: string; cause?: { code?: unknown; message?: string }; message?: string } | undefined
     const reason = err?.cause?.message ?? err?.message ?? String(input)
     const lower = reason.toLowerCase()
 
@@ -126,10 +125,10 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
         return toFailure(['execution-reverted', false, REVERT_ACTION], reason)
     }
 
-    // EntryPoint AAxx revert code.
-    for (const code of Object.keys(AA_CODES)) {
-        if (lower.includes(code.toLowerCase())) return toFailure(AA_CODES[code], reason, code)
-    }
+    // EntryPoint AAxx revert code. Thrown AbstractionKitErrors carry it parsed
+    // on `aaCode` (since 0.4.0); parseAaCode() covers errors from other sources.
+    const aaCode = err?.aaCode ?? parseAaCode(reason)
+    if (aaCode && AA_CODES[aaCode]) return toFailure(AA_CODES[aaCode], reason, aaCode)
 
     // Gas fee and gas-limit failures, by keyword. Can come from the bundler or the paymaster.
     for (const rule of KEYWORD_RULES) {
