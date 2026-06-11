@@ -34,7 +34,7 @@ npx ts-node error-handling/<script>.ts
 | # | Script | How gas is paid | What fails |
 |---|--------|-----------------|------------|
 | 1 | `1-no-paymaster-underfunded.ts` | Self-funded | Account has no ETH for the prefund (`AA21`) |
-| 2 | `2-token-insufficient.ts` | Token paymaster | Account holds none of the gas token |
+| 2 | `2-token-insufficient.ts` | Token paymaster | Account's gas-token balance is below the required amount (`validator: token balance lower than the required … allowance`) — none or just not enough |
 | 3 | `3-sponsor-denied.ts` | Sponsor paymaster | Sponsorship policy rejects the op |
 | 4 | `4-included-reverted.ts` | Self-funded | Op is mined, then the inner call reverts |
 | 5 | `5-gas-too-low-retry.ts` | Self-funded | Op is underpriced, then retried until it succeeds |
