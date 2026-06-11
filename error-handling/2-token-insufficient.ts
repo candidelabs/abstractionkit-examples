@@ -3,11 +3,20 @@ import { SafeMultiChainSigAccountV1 as SafeAccount, MetaTransaction, Erc7677Paym
 import { classifyUserOpFailure } from './classifyUserOpFailure'
 
 /**
- * Pay gas in an ERC-20 token, but the account holds none of it.
+ * Pay gas in an ERC-20 token, but the account's token balance is below what the
+ * paymaster needs. This covers both "holds none" and "holds some, but not
+ * enough" — the failure is identical either way.
  *
- * The token-paymaster flow has nothing to charge, so it fails. Depending on the
- * bundler this shows up as a thrown error at send time, or as a success:false
- * receipt. The handler below covers both paths.
+ * When the required amount exceeds the balance, the Candide paymaster rejects
+ * the op during the paymaster call with:
+ *
+ *     validator: token balance lower than the required 0x5be0f allowance
+ *
+ * abstractionkit surfaces that as an AbstractionKitError with code
+ * PAYMASTER_ERROR (the validator message on err.cause.message), which
+ * classifyUserOpFailure maps to category 'insufficient-token-funds'. Depending
+ * on the bundler an underfunded op can instead slip through to send time or to a
+ * success:false receipt, so the handler below covers both paths.
  */
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl } = loadEnv()
