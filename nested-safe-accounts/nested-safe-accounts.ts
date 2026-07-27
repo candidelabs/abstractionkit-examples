@@ -141,12 +141,22 @@ async function main(): Promise<void> {
         mainAccount, mainAccountUserOperation, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined)
     mainAccountUserOperation = paymasterUserOperation1;
 
-    mainAccountUserOperation.signature = SafeAccount.formatSignaturesToUseroperationSignature(
+    //use the multichain formatter (not the parent formatSignaturesToUseroperationSignature):
+    //the multichain module expects the signature prefixed with the merkle tree depth
+    //(0x00 for a single useroperation) plus the validity window, and hashed against
+    //the multichain module address. The parent helper emits neither, so the account
+    //rejects the signature.
+    mainAccountUserOperation.signature = SafeAccount.formatSignaturesToUseroperationsSignatures(
+        [{ userOperation: mainAccountUserOperation, chainId }],
         [subAccount1SignerSignaturePair, subAccount2SignerSignaturePair],
-    )
+    )[0]
     /***********************************/
     //create approveHash metaTransaction
-    const userOperationEip712Hash = SafeAccount.getUserOperationEip712Hash_V9(
+    //use the multichain-class override (not the parent getUserOperationEip712Hash_V9),
+    //it defaults safe4337ModuleAddress to the multichain module the account actually
+    //verifies against. The parent helper defaults to a different module, so the
+    //approved hash would not match and the bundler rejects with INVALID_SIGNATURE.
+    const userOperationEip712Hash = SafeAccount.getUserOperationEip712Hash(
         mainAccountUserOperation,
         chainId,
     );
