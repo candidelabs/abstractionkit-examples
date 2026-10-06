@@ -88,6 +88,15 @@ async function main(): Promise<void> {
         console.log("Fund the sender account : " + userOperation.sender + " with at least " + tokenQuote.tokenCost + " of the token")
     }
 
+    // Anyone holding only the finished useroperation (e.g. another Safe owner)
+    // can read what it commits to pay, from the data the paymaster signed.
+    // The node rpc is only used to look up a Candide paymaster's token.
+    const quote = await Erc7677Paymaster.decodeTokenQuote(userOperation, nodeUrl)
+    if (quote) {
+        console.log("Max fee : up to " + quote.maxTokenCost + " of " + quote.token
+            + " (paymaster quote expires " + new Date(quote.validUntil * 1000).toISOString() + ")")
+    }
+
     //Safe is a multisig that can have multiple owners/signers
     //signUserOperation will create a signature for the provided
     //privateKeys
