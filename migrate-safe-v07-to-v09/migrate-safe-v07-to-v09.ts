@@ -30,7 +30,7 @@ import {
 //   new EntryPoint. The Safe singleton (master copy) does NOT change.
 //
 //   Since abstractionkit 0.4.0, the SDK composes this exact batch for you:
-//   oldAccount.createMigrateToSafeMultiChainSigAccountV1MetaTransactions(nodeUrl).
+//   oldAccount.createMigrateToSafeMultiChainSigAccountMetaTransactions(nodeUrl).
 //
 // STORAGE CLEARING — none required.
 //   Both Safe4337Module (v0.7) and Safe4337MultiChainSignatureModule (v0.9) are
@@ -131,7 +131,7 @@ async function main(): Promise<void> {
     console.log(`Phase 2: migrating to EntryPoint v0.9 (module ${NEW_MODULE})`)
 
     const migrationBatch =
-        await oldAccount.createMigrateToSafeMultiChainSigAccountV1MetaTransactions(nodeUrl)
+        await oldAccount.createMigrateToSafeMultiChainSigAccountMetaTransactions(nodeUrl)
 
     let migrateOp = await oldAccount.createUserOperation(migrationBatch, nodeUrl, bundlerUrl)
 
