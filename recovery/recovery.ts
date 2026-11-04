@@ -3,7 +3,7 @@ import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     calculateUserOperationMaxGasCost,
     Erc7677Paymaster,
-    SocialRecoveryModule
+    SocialRecoveryModuleV2
 } from "abstractionkit";
 
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
@@ -27,7 +27,10 @@ async function main(): Promise<void> {
 
     console.log("Account address(sender) : " + smartAccount.accountAddress)
 
-    const srm = new SocialRecoveryModule()
+    // Social Recovery Module v0.2.0, the recommended version for new accounts
+    // (defaults to the 3-day grace period deployment).
+    // Accounts that enabled the v0.1.0 module must use SocialRecoveryModuleV1.
+    const srm = new SocialRecoveryModuleV2()
 
     const transction1 = srm.createEnableModuleMetaTransaction(
         smartAccount.accountAddress

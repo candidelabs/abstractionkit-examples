@@ -19,8 +19,10 @@ You can override to EntryPoint v0.9 via the constructor to use features like par
 
 | Version | Singleton | EntryPoint |
 |---------|-----------|------------|
-| v0.8 (default) | `0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00` | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` |
+| v0.8 (default, Calibur v1.1.0) | `0x000000005c84F8Fd50b21CAC312528A64437030e` | `0x0000000071727De22E5E9d8BAf0edAc6f37da032` |
 | v0.9 (override) | `0x71032285A847c4311Eb7ec2E7A636aB94A9805Aa` | `0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108` |
+
+Since abstractionkit 1.0.0 the default delegatee is Calibur v1.1.0 (`CALIBUR_UNISWAP_V1_1_0_SINGLETON_ADDRESS`). It keeps the v1.0.0 storage layout, so registered keys survive re-delegation. The examples re-delegate an EOA still on v1.0.0 automatically; to keep using v1.0.0, pass `{ delegateeAddress: "0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00" }` to the constructor.
 
 ## Key Types
 
