@@ -15,10 +15,15 @@ export async function waitForNonceAfter(
     usedNonce: bigint,
 ): Promise<void> {
     const key = usedNonce >> 64n // a 4337 nonce is (key << 64) | sequence
+    let lastError: unknown
     for (let attempt = 0; attempt < 10; attempt++) {
-        const nonce = await fetchAccountNonce(nodeUrl, account.entrypointAddress, account.accountAddress, key)
-        if (nonce > usedNonce) return
+        try {
+            const nonce = await fetchAccountNonce(nodeUrl, account.entrypointAddress, account.accountAddress, key)
+            if (nonce > usedNonce) return
+        } catch (err) {
+            lastError = err // a lagging or flaky node; try again
+        }
         await new Promise((resolve) => setTimeout(resolve, 2000))
     }
-    throw new Error(`Account nonce did not advance past ${usedNonce}.`)
+    throw new Error(`Account nonce did not advance past ${usedNonce}.`, { cause: lastError })
 }
