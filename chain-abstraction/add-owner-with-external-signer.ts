@@ -30,6 +30,11 @@ import { createWalletClient, http } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 
 import { getOrCreateOwner, loadMultiChainEnv } from '../utils/env'
+import { waitForState } from '../utils/wait'
+
+/** True when `owner` is in `owners` (case-insensitive). */
+const hasOwner = (owners: string[], owner: string): boolean =>
+    owners.some((o) => o.toLowerCase() === owner.toLowerCase())
 
 async function main(): Promise<void> {
     const {
@@ -126,13 +131,17 @@ async function main(): Promise<void> {
     console.log('Chain 2 Tx    :', r2.receipt.transactionHash, '| success:', r2.success)
     if (!r1.success || !r2.success) throw new Error('at least one chain reverted')
 
-    // 9. Read back the owner set on each chain to confirm.
+    // 9. Read back the owner set on each chain to confirm (re-read until the
+    //    node serving the request has caught up with the inclusion block).
     const [owners1, owners2] = await Promise.all([
-        smartAccount.getOwners(nodeUrl1),
-        smartAccount.getOwners(nodeUrl2),
+        waitForState(() => smartAccount.getOwners(nodeUrl1), (owners) => hasOwner(owners, newOwner)),
+        waitForState(() => smartAccount.getOwners(nodeUrl2), (owners) => hasOwner(owners, newOwner)),
     ])
     console.log('Chain 1 owners:', owners1)
     console.log('Chain 2 owners:', owners2)
+    if (!hasOwner(owners1, newOwner) || !hasOwner(owners2, newOwner)) {
+        throw new Error('new owner not found on one of the chains')
+    }
 }
 
 main().catch((err: unknown) => {

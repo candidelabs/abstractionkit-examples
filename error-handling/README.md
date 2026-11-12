@@ -93,7 +93,10 @@ first, then the EntryPoint `AAxx` code, and only then keyword matching for the t
 cases no code pins down (token vs sponsor, both `-32003`; fee and gas-limit errors,
 `-32602`). Since abstractionkit 0.4.0 the `AAxx` code arrives pre-parsed on a thrown
 `AbstractionKitError` as `err.aaCode`, with the exported `parseAaCode(message)` as a
-fallback for errors from other sources. Those keyword strings are tuned for Candide,
+fallback for errors from other sources. Since abstractionkit 2.0.0 the paymaster
+clients name who failed: a paymaster rejection during gas estimation (`AA3x`,
+`AA50`) is a `PAYMASTER_ERROR` that still carries the bundler's `aaCode`, while any
+other estimation failure (e.g. `AA23`) stays a `BUNDLER_ERROR`. Those keyword strings are tuned for Candide,
 so swap them for another provider.
 
 ## Out-of-gas vs revert
@@ -104,7 +107,10 @@ on purpose. abstractionkit's `decodeUserOperationRevertReason` reads the EntryPo
 call, matches the receipt's `userOpHash` (so multi-op bundles return the right
 entry), and returns the reason: a string for `revert("...")`, a panic code for
 `assert`, or empty data, which usually means out-of-gas (so it reports
-`outOfGas: true`). For certainty about out-of-gas, trace the bundle transaction with
+`outOfGas: true`). Since abstractionkit 2.0.0 it also reads the EntryPoint's
+`PostOpRevertReason` and `UserOperationPrefundTooLow` logs (v0.7+) and reports them
+as `postOpReverted` (a paymaster `postOp` revert, decoded into `errorMessage`) and
+`prefundTooLow`, instead of calling either one out-of-gas. For certainty about out-of-gas, trace the bundle transaction with
 `debug_traceTransaction` or Tenderly, which is a one-off debugging step rather than
 a per-transaction call.
 

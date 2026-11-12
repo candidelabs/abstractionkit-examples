@@ -17,6 +17,7 @@
  */
 
 import { loadMultiChainEnv, getOrCreateOwner } from '../utils/env'
+import { waitForState } from '../utils/wait'
 import { createWalletClient, http } from 'viem'
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 import { sepolia } from 'viem/chains'
@@ -26,6 +27,10 @@ import {
     type CandidePaymasterContext,
     UserOperationV9,
 } from "abstractionkit";
+
+/** True when `owner` is in `owners` (case-insensitive). */
+const hasOwner = (owners: string[], owner: string): boolean =>
+    owners.some((o) => o.toLowerCase() === owner.toLowerCase())
 
 async function main(): Promise<void> {
     const { chainId1, chainId2, bundlerUrl1, bundlerUrl2, nodeUrl1, nodeUrl2, paymasterUrl1, paymasterUrl2, sponsorshipPolicyId1, sponsorshipPolicyId2 } = loadMultiChainEnv()
@@ -150,8 +155,8 @@ async function main(): Promise<void> {
     console.log("\nVerifying owners on both chains...")
 
     const [owners1, owners2] = await Promise.all([
-        smartAccount.getOwners(nodeUrl1),
-        smartAccount.getOwners(nodeUrl2)
+        waitForState(() => smartAccount.getOwners(nodeUrl1), (owners) => hasOwner(owners, newOwnerAddress)),
+        waitForState(() => smartAccount.getOwners(nodeUrl2), (owners) => hasOwner(owners, newOwnerAddress))
     ]);
 
     console.log("\n" + "=".repeat(60))
@@ -160,8 +165,8 @@ async function main(): Promise<void> {
     console.log("\nOwners on Chain 1:", owners1)
     console.log("Owners on Chain 2:", owners2)
 
-    const hasNewOwner1 = owners1.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
-    const hasNewOwner2 = owners2.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
+    const hasNewOwner1 = hasOwner(owners1, newOwnerAddress)
+    const hasNewOwner2 = hasOwner(owners2, newOwnerAddress)
 
     if (hasNewOwner1 && hasNewOwner2) {
         console.log("\nNew owner successfully added on BOTH chains!")

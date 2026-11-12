@@ -3,7 +3,7 @@ import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     calculateUserOperationMaxGasCost,
     Erc7677Paymaster,
-    SocialRecoveryModule
+    SocialRecoveryModuleV2
 } from "abstractionkit";
 
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
@@ -27,7 +27,7 @@ async function main(): Promise<void> {
 
     console.log("Account address(sender) : " + smartAccount.accountAddress)
 
-    const srm = new SocialRecoveryModule()
+    const srm = new SocialRecoveryModuleV2()
 
     const transction1 = srm.createEnableModuleMetaTransaction(
         smartAccount.accountAddress

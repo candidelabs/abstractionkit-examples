@@ -78,7 +78,9 @@ async function main(): Promise<void> {
             console.log(failure)
 
             const revert = decodeUserOperationRevertReason(receipt)
-            if (revert.errorMessage) console.log('\nRevert reason:', revert.errorMessage)
+            if (revert.postOpReverted) console.log("\nThe paymaster's postOp reverted" + (revert.errorMessage ? `: ${revert.errorMessage}` : '.'))
+            else if (revert.prefundTooLow) console.log('\nThe prefund was too low for the actual gas cost.')
+            else if (revert.errorMessage) console.log('\nRevert reason:', revert.errorMessage)
             else if (revert.outOfGas) console.log('\nNo revert data: most likely out of gas.')
 
             console.log('\nSuggested wallet action:', failure.suggestedAction)

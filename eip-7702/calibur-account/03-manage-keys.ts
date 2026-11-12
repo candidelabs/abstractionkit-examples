@@ -27,6 +27,7 @@
  */
 
 import { loadEnv, getOrCreateOwner } from '../../utils/env'
+import { waitForNonceAfter, waitForState } from '../../utils/wait'
 import { generatePrivateKey, privateKeyToAddress } from 'viem/accounts'
 import {
     Calibur7702Account,
@@ -108,6 +109,8 @@ async function main(): Promise<void> {
     console.log("Sending registration UserOp...")
     const registerResponse = await smartAccount.sendUserOperation(registerOp, bundlerUrl)
     const registerReceipt = await registerResponse.included()
+    // Make sure the next UserOperation is built on this one's nonce, not a stale one.
+    if (registerReceipt) await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, registerOp.nonce)
 
     if (registerReceipt == null) {
         console.log("Receipt not found (timeout)")
@@ -119,8 +122,11 @@ async function main(): Promise<void> {
         return
     }
 
-    // Verify registration
-    const isRegistered = await smartAccount.isKeyRegistered(nodeUrl, newKeyHash)
+    // Verify registration. waitForState re-reads until the node serving the
+    // request has caught up with the block that included the UserOperation.
+    const isRegistered = await waitForState(
+        () => smartAccount.isKeyRegistered(nodeUrl, newKeyHash), (registered) => registered,
+    )
     console.log("Registered on-chain:", isRegistered)
 
     // ════════════════════════════════════════════════════════════════════════
@@ -152,6 +158,8 @@ async function main(): Promise<void> {
 
     const secondaryResponse = await smartAccount.sendUserOperation(secondaryOp, bundlerUrl)
     const secondaryReceipt = await secondaryResponse.included()
+    // Make sure the next UserOperation is built on this one's nonce, not a stale one.
+    if (secondaryReceipt) await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, secondaryOp.nonce)
 
     if (secondaryReceipt == null) {
         console.log("Receipt not found (timeout)")
@@ -170,12 +178,11 @@ async function main(): Promise<void> {
     // update() will be rejected with OnlyAdminCanSelfCall.
     console.log("\nUpdating key expiration to 1 year...")
 
+    // Extend to 1 year from now
+    const newExpiration = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60
     const updateTx = Calibur7702Account.createUpdateKeySettingsMetaTransaction(
         newKeyHash,
-        {
-            // Extend to 1 year from now
-            expiration: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
-        }
+        { expiration: newExpiration },
     )
 
     let updateOp = await smartAccount.createUserOperation(
@@ -191,12 +198,17 @@ async function main(): Promise<void> {
 
     const updateResponse = await smartAccount.sendUserOperation(updateOp, bundlerUrl)
     const updateReceipt = await updateResponse.included()
+    // Make sure the next UserOperation is built on this one's nonce, not a stale one.
+    if (updateReceipt) await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, updateOp.nonce)
 
     if (updateReceipt == null) {
         console.log("Receipt not found (timeout)")
         return
     } else if (updateReceipt.success) {
-        const updatedSettings = await smartAccount.getKeySettings(nodeUrl, newKeyHash)
+        const updatedSettings = await waitForState(
+            () => smartAccount.getKeySettings(nodeUrl, newKeyHash),
+            (settings) => settings.expiration === newExpiration,
+        )
         console.log("Expiration updated to:", new Date(updatedSettings.expiration * 1000).toISOString())
         console.log("Tx:", updateReceipt.receipt.transactionHash)
     } else {
@@ -230,7 +242,9 @@ async function main(): Promise<void> {
         console.log("Receipt not found (timeout)")
         return
     } else if (revokeReceipt.success) {
-        const stillRegistered = await smartAccount.isKeyRegistered(nodeUrl, newKeyHash)
+        const stillRegistered = await waitForState(
+            () => smartAccount.isKeyRegistered(nodeUrl, newKeyHash), (registered) => !registered,
+        )
         console.log("Key still registered:", stillRegistered) // false
         console.log("Tx:", revokeReceipt.receipt.transactionHash)
     } else {

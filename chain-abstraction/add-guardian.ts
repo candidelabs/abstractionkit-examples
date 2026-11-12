@@ -20,8 +20,8 @@ import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     CandidePaymaster,
     type CandidePaymasterContext,
-    SocialRecoveryModule,
-    SocialRecoveryModuleGracePeriodSelector,
+    SocialRecoveryModuleV2,
+    SocialRecoveryModuleGracePeriodSelectorV2,
     UserOperationV9,
 } from "abstractionkit";
 
@@ -49,8 +49,8 @@ async function main(): Promise<void> {
     console.log("  - Chain 1:", chainId1.toString())
     console.log("  - Chain 2:", chainId2.toString())
 
-    const gracePeriod3Minutes = SocialRecoveryModuleGracePeriodSelector.After3Minutes;
-    const srm = new SocialRecoveryModule(gracePeriod3Minutes)
+    const gracePeriod3Minutes = SocialRecoveryModuleGracePeriodSelectorV2.After3Minutes;
+    const srm = new SocialRecoveryModuleV2(gracePeriod3Minutes)
 
     console.log("\n[1/6] Creating guardian setup transactions...")
 

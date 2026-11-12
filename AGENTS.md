@@ -125,6 +125,14 @@ abstractionkit 0.4.0 the SDK does the parsing for you: a thrown
 `decodeUserOperationRevertReason(receipt)` decodes a mined-but-failed op's revert
 reason from the receipt with no extra RPC call.
 
+Since abstractionkit 2.0.0 the paymaster clients name who failed: a paymaster
+rejection during gas estimation (`AA3x`, `AA50`) throws `PAYMASTER_ERROR` with the
+bundler's `aaCode` copied onto it; any other estimation failure (e.g. `AA23`) stays
+`BUNDLER_ERROR`. Branch on `err.aaCode` for the specific cause. The decoder also
+reports `postOpReverted` (paymaster `postOp` revert) and `prefundTooLow` instead of
+folding them into `outOfGas`, and `response.included()` keeps polling through a
+transient failure (it becomes the `cause` of the eventual `TIMEOUT`).
+
 ### "AA21 didn't pay prefund"
 Account has insufficient ETH and no paymaster is sponsoring.
 **Fix:** Use the `sponsor-gas/` example with the public paymaster, or fund the smart account address.
@@ -219,6 +227,7 @@ strings in 0.3.x and earlier).
 | Class | Use Case | EntryPoint | External Signer method |
 |-------|----------|------------|------------------------|
 | `SafeMultiChainSigAccountV1` | Most examples (recommended) — single-chain + Safe Unified Account multichain | v0.9 | `signUserOperationWithSigners(op, signers[], chainId)` (single), `signUserOperationsWithSigners(ops[], signers[])` (multichain) |
+| `SafeMultiChainSigAccountV2` | Same module and signing as V1, but new accounts deploy the Safe L2 **v1.5.0** singleton (V1 deploys v1.4.1). Different counterfactual address; a deployed account can be attached with either class | v0.9 | Same as `SafeMultiChainSigAccountV1` |
 | `SafeAccountV0_3_0` | Legacy v0.7 compatibility | v0.7 | `signUserOperationWithSigners(op, signers[], chainId)` |
 | `SafeAccountV0_2_0` | Legacy/v0.6 compatibility | v0.6 | `signUserOperationWithSigners(op, signers[], chainId)` |
 | `Simple7702AccountV09` | EIP-7702 delegation (recommended) | v0.9 | `signUserOperationWithSigner(op, signer, chainId)` |
@@ -230,7 +239,8 @@ strings in 0.3.x and earlier).
 > module" Safe and runs on **EntryPoint v0.7** (not v0.8); `SafeAccountV0_2_0` is
 > the "0.2.0 module" on **EntryPoint v0.6**. There is no Safe class for EntryPoint
 > v0.8 — the SDK jumps from the v0.7 Safe straight to `SafeMultiChainSigAccountV1`
-> on **v0.9**. See the `EntryPoint` column above for the authoritative mapping.
+> / `SafeMultiChainSigAccountV2` on **v0.9** (V1 and V2 share the module and differ
+> only in the Safe singleton they deploy: v1.4.1 vs v1.5.0). See the `EntryPoint` column above for the authoritative mapping.
 
 ## Paymaster Patterns
 

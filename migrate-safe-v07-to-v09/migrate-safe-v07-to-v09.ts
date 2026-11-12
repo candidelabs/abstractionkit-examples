@@ -1,4 +1,5 @@
 import { loadEnv, getOrCreateOwner } from '../utils/env'
+import { waitForState } from '../utils/wait'
 import {
     SafeAccountV0_3_0,
     SafeMultiChainSigAccountV1,
@@ -29,8 +30,8 @@ import {
 //   After these land, the Safe validates/executes through the new module on the
 //   new EntryPoint. The Safe singleton (master copy) does NOT change.
 //
-//   Since abstractionkit 0.4.0, the SDK composes this exact batch for you:
-//   oldAccount.createMigrateToSafeMultiChainSigAccountV1MetaTransactions(nodeUrl).
+//   The SDK composes this exact batch for you (renamed in abstractionkit 1.0.0):
+//   oldAccount.createMigrateToSafeMultiChainSigAccountMetaTransactions(nodeUrl).
 //
 // STORAGE CLEARING — none required.
 //   Both Safe4337Module (v0.7) and Safe4337MultiChainSignatureModule (v0.9) are
@@ -57,18 +58,9 @@ import {
 const OLD_MODULE = SafeAccountV0_3_0.DEFAULT_SAFE_4337_MODULE_ADDRESS // EP v0.7 module
 const NEW_MODULE = SafeMultiChainSigAccountV1.DEFAULT_SAFE_4337_MODULE_ADDRESS // EP v0.9 module
 
-/**
- * Poll an on-chain read until it returns true. The public RPC is load-balanced,
- * so a just-mined state change is not always visible to the next request; a read
- * can also throw while a backend has not seen the deployment yet.
- */
-async function untilTrue(read: () => Promise<boolean>, attempts = 5, delayMs = 3000): Promise<boolean> {
-    for (let i = 0; i < attempts; i++) {
-        try { if (await read()) return true } catch { /* backend lag; retry */ }
-        await new Promise((resolve) => setTimeout(resolve, delayMs))
-    }
-    return false
-}
+/** Poll an on-chain read until it returns true (see utils/wait.ts for why). */
+const untilTrue = async (read: () => Promise<boolean>): Promise<boolean> =>
+    waitForState(read, (ok) => ok).catch(() => false)
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()
@@ -131,7 +123,7 @@ async function main(): Promise<void> {
     console.log(`Phase 2: migrating to EntryPoint v0.9 (module ${NEW_MODULE})`)
 
     const migrationBatch =
-        await oldAccount.createMigrateToSafeMultiChainSigAccountV1MetaTransactions(nodeUrl)
+        await oldAccount.createMigrateToSafeMultiChainSigAccountMetaTransactions(nodeUrl)
 
     let migrateOp = await oldAccount.createUserOperation(migrationBatch, nodeUrl, bundlerUrl)
 

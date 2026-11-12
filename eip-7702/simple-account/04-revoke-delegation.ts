@@ -1,4 +1,5 @@
 import { requireEnv, getOrCreateOwner } from '../../utils/env'
+import { waitForState } from '../../utils/wait'
 import { Simple7702AccountV09 as Simple7702Account } from "abstractionkit"
 import { createPublicClient, http, formatEther } from "viem"
 
@@ -61,7 +62,9 @@ async function main(): Promise<void> {
     const receipt = await client.waitForTransactionReceipt({ hash: txHash as `0x${string}` })
 
     if (receipt.status === 'success') {
-        const stillDelegated = await smartAccount.isDelegatedToThisAccount(nodeUrl)
+        const stillDelegated = await waitForState(
+            () => smartAccount.isDelegatedToThisAccount(nodeUrl), (delegated) => !delegated,
+        )
         if (!stillDelegated) {
             console.log("Delegation revoked! EOA is back to a regular account.")
         } else {
