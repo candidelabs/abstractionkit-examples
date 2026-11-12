@@ -149,8 +149,11 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
     // A token paymaster that rejects the op for the account's token balance or
     // allowance. A paymaster rejection during gas estimation is a PAYMASTER_ERROR
     // that also carries the bundler's AA3x code, so check the token wording before
-    // the AAxx table maps AA33 to a denial.
-    if (err?.code === 'PAYMASTER_ERROR' && hasAny(lower, ['token', 'allowance', 'balance'])) {
+    // the AAxx table maps AA33 to a denial. That error repeats the bundler's reason
+    // in its own message (its cause only says the estimation call failed), so test
+    // the outer message too.
+    if (err?.code === 'PAYMASTER_ERROR'
+        && hasAny(`${err.message ?? ''} ${lower}`.toLowerCase(), ['token', 'allowance', 'balance'])) {
         return toFailure(['insufficient-token-funds', true, 'Fund the account with more of the gas token and retry.'], reason, err.aaCode)
     }
 

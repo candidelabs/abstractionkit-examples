@@ -159,6 +159,11 @@ async function main(): Promise<void> {
         () => srm.getRecoveryRequest(nodeUrl, accountAddress),
         (request) => request.executableAt > 0n,
     )
+    // Without a pending request there is no grace period to wait out, and
+    // finalizing now would fail, so stop here.
+    if (recoveryRequest.executableAt === 0n) {
+        throw new Error("The node still reports no pending recovery request for " + accountAddress)
+    }
     console.log("  Approvals      : " + recoveryRequest.guardiansApprovalCount)
     console.log("  New owners     : " + recoveryRequest.newOwners.join(", "))
     console.log("  New threshold  : " + recoveryRequest.newThreshold)
