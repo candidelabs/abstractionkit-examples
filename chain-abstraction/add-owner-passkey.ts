@@ -40,16 +40,11 @@ import { hexToBytes, keccak256, numberToBytes, toBytes } from 'viem'
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts'
 
 import { loadMultiChainEnv } from '../utils/env'
-import { waitForState } from '../utils/wait'
 import {
     UserVerificationRequirement,
     WebAuthnCredentials,
     extractPublicKey,
 } from '../passkeys/webauthn'
-
-/** True when `owner` is in `owners` (case-insensitive). */
-const hasOwner = (owners: string[], owner: string): boolean =>
-    owners.some((o) => o.toLowerCase() === owner.toLowerCase())
 
 async function main(): Promise<void> {
     const {
@@ -180,11 +175,11 @@ async function main(): Promise<void> {
 
     // Verify owners on both chains.
     const [owners1, owners2] = await Promise.all([
-        waitForState(() => smartAccount.getOwners(nodeUrl1), (owners) => hasOwner(owners, newOwnerAddress)),
-        waitForState(() => smartAccount.getOwners(nodeUrl2), (owners) => hasOwner(owners, newOwnerAddress)),
+        smartAccount.getOwners(nodeUrl1),
+        smartAccount.getOwners(nodeUrl2),
     ])
-    const has1 = hasOwner(owners1, newOwnerAddress)
-    const has2 = hasOwner(owners2, newOwnerAddress)
+    const has1 = owners1.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
+    const has2 = owners2.map((o: string) => o.toLowerCase()).includes(newOwnerAddress.toLowerCase())
 
     console.log('\n' + '='.repeat(60))
     console.log('Owners on Chain 1:', owners1)

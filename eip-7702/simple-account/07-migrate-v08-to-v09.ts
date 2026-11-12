@@ -1,5 +1,4 @@
 import { loadEnv, getOrCreateOwner } from '../../utils/env'
-import { waitForState } from '../../utils/wait'
 import {
     Simple7702Account,
     Simple7702AccountV09,
@@ -77,7 +76,7 @@ async function main(): Promise<void> {
     }
     console.log(`Phase 1 included: ${v08Receipt.receipt.transactionHash}`)
 
-    if (!(await waitForState(() => v08.isDelegatedToThisAccount(nodeUrl), (delegated) => delegated))) {
+    if (!(await v08.isDelegatedToThisAccount(nodeUrl))) {
         throw new Error("EOA is not delegated to the v0.8 impl after Phase 1.")
     }
 
@@ -133,7 +132,7 @@ async function main(): Promise<void> {
     // ═════════════════════════════════════════════════════════════════════════
     // Verify the final delegation state
     // ═════════════════════════════════════════════════════════════════════════
-    const onV09 = await waitForState(() => v09.isDelegatedToThisAccount(nodeUrl), (delegated) => delegated)
+    const onV09 = await v09.isDelegatedToThisAccount(nodeUrl)
     const stillOnV08 = await v08.isDelegatedToThisAccount(nodeUrl)
 
     console.log("──────────────────────────────────────────────")

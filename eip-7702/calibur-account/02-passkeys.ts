@@ -24,7 +24,6 @@
 
 import * as crypto from 'crypto'
 import { loadEnv, getOrCreateOwner } from '../../utils/env'
-import { waitForState } from '../../utils/wait'
 import { toBytes, toHex } from 'viem'
 import {
     Calibur7702Account,
@@ -161,10 +160,8 @@ async function main(): Promise<void> {
     }
     console.log("Passkey registered! Tx:", registerReceipt.receipt.transactionHash)
 
-    // Verify the key is registered on-chain (re-read until the node has caught up)
-    const isRegistered = await waitForState(
-        () => smartAccount.isKeyRegistered(nodeUrl, keyHash), (registered) => registered,
-    )
+    // Verify the key is registered on-chain
+    const isRegistered = await smartAccount.isKeyRegistered(nodeUrl, keyHash)
     console.log("Key registered on-chain:", isRegistered)
 
     const settings = await smartAccount.getKeySettings(nodeUrl, keyHash)

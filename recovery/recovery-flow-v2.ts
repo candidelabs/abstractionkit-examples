@@ -20,7 +20,7 @@
  */
 
 import { loadEnv, getOrCreateOwner } from '../utils/env'
-import { waitForNonceAfter, waitForState } from '../utils/wait'
+import { waitForNonceAfter } from '../utils/wait'
 import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     Erc7677Paymaster,
@@ -61,9 +61,7 @@ async function main(): Promise<void> {
             throw new Error("Useroperation execution failed. Tx: " + receipt.receipt.transactionHash)
         }
         console.log("  Included. The transaction hash is : " + receipt.receipt.transactionHash)
-        // The public RPC is load-balanced: wait until it has seen this block, so
-        // the reads and UserOperations that follow are built on fresh state.
-        await waitForNonceAfter(nodeUrl, account.entrypointAddress, account.accountAddress, userOperation.nonce)
+        await waitForNonceAfter(nodeUrl, account, userOperation.nonce) // let the RPC catch up before the next step
     }
 
     // The guardian is a plain EOA. It only signs, so it needs no funds.
@@ -102,9 +100,7 @@ async function main(): Promise<void> {
         srm.createAddGuardianWithThresholdMetaTransaction(guardian.address, 1n),
     ], ownerPrivateKey)
 
-    const isGuardian = await waitForState(
-        () => srm.isGuardian(nodeUrl, accountAddress, guardian.address), (added) => added,
-    )
+    const isGuardian = await srm.isGuardian(nodeUrl, accountAddress, guardian.address)
     console.log("  Guardian added : " + isGuardian)
 
     // ──────────────────────────────────────────────────────────────────────
@@ -155,15 +151,7 @@ async function main(): Promise<void> {
     // Step 3: Read the pending recovery request
     // ──────────────────────────────────────────────────────────────────────
     console.log("\n[3/4] Reading the recovery request...")
-    const recoveryRequest = await waitForState(
-        () => srm.getRecoveryRequest(nodeUrl, accountAddress),
-        (request) => request.executableAt > 0n,
-    )
-    // Without a pending request there is no grace period to wait out, and
-    // finalizing now would fail, so stop here.
-    if (recoveryRequest.executableAt === 0n) {
-        throw new Error("The node still reports no pending recovery request for " + accountAddress)
-    }
+    const recoveryRequest = await srm.getRecoveryRequest(nodeUrl, accountAddress)
     console.log("  Approvals      : " + recoveryRequest.guardiansApprovalCount)
     console.log("  New owners     : " + recoveryRequest.newOwners.join(", "))
     console.log("  New threshold  : " + recoveryRequest.newThreshold)
@@ -193,10 +181,7 @@ async function main(): Promise<void> {
         relayerOwnerPrivateKey,
     )
 
-    const owners = await waitForState(
-        () => smartAccount.getOwners(nodeUrl),
-        (current) => current.length === 1 && current[0].toLowerCase() === newOwner.address.toLowerCase(),
-    )
+    const owners = await smartAccount.getOwners(nodeUrl)
     console.log("  Account owners : " + owners.join(", "))
     if (owners.length === 1 && owners[0].toLowerCase() === newOwner.address.toLowerCase()) {
         console.log("\nRecovery complete. The account is now controlled by the new owner.")

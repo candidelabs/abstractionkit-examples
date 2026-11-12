@@ -1,5 +1,4 @@
 import { loadEnv, getOrCreateOwner } from '../utils/env'
-import { waitForState } from '../utils/wait'
 import {
     SafeAccountV0_3_0,
     SafeMultiChainSigAccountV1,
@@ -58,9 +57,18 @@ import {
 const OLD_MODULE = SafeAccountV0_3_0.DEFAULT_SAFE_4337_MODULE_ADDRESS // EP v0.7 module
 const NEW_MODULE = SafeMultiChainSigAccountV1.DEFAULT_SAFE_4337_MODULE_ADDRESS // EP v0.9 module
 
-/** Poll an on-chain read until it returns true (see utils/wait.ts for why). */
-const untilTrue = async (read: () => Promise<boolean>): Promise<boolean> =>
-    waitForState(read, (ok) => ok).catch(() => false)
+/**
+ * Poll an on-chain read until it returns true. The public RPC is load-balanced,
+ * so a just-mined state change is not always visible to the next request; a read
+ * can also throw while a backend has not seen the deployment yet.
+ */
+async function untilTrue(read: () => Promise<boolean>, attempts = 5, delayMs = 3000): Promise<boolean> {
+    for (let i = 0; i < attempts; i++) {
+        try { if (await read()) return true } catch { /* backend lag; retry */ }
+        await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
+    return false
+}
 
 async function main(): Promise<void> {
     const { chainId, bundlerUrl, nodeUrl, paymasterUrl, sponsorshipPolicyId } = loadEnv()

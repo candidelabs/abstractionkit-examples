@@ -27,7 +27,7 @@
  */
 
 import { loadEnv, getOrCreateOwner } from '../../utils/env'
-import { waitForNonceAfter, waitForState } from '../../utils/wait'
+import { waitForNonceAfter } from '../../utils/wait'
 import { generatePrivateKey, privateKeyToAddress } from 'viem/accounts'
 import {
     Calibur7702Account,
@@ -109,11 +109,7 @@ async function main(): Promise<void> {
     console.log("Sending registration UserOp...")
     const registerResponse = await smartAccount.sendUserOperation(registerOp, bundlerUrl)
     const registerReceipt = await registerResponse.included()
-    // Wait until the node has seen this UserOperation, and build the next one on
-    // the nonce observed here instead of reading it again from a lagging node.
-    const nonceAfterRegister = registerReceipt
-        ? await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, registerOp.nonce)
-        : undefined
+    await waitForNonceAfter(nodeUrl, smartAccount, registerOp.nonce) // let the RPC catch up before the next op
 
     if (registerReceipt == null) {
         console.log("Receipt not found (timeout)")
@@ -125,11 +121,8 @@ async function main(): Promise<void> {
         return
     }
 
-    // Verify registration. waitForState re-reads until the node serving the
-    // request has caught up with the block that included the UserOperation.
-    const isRegistered = await waitForState(
-        () => smartAccount.isKeyRegistered(nodeUrl, newKeyHash), (registered) => registered,
-    )
+    // Verify registration
+    const isRegistered = await smartAccount.isKeyRegistered(nodeUrl, newKeyHash)
     console.log("Registered on-chain:", isRegistered)
 
     // ════════════════════════════════════════════════════════════════════════
@@ -149,7 +142,7 @@ async function main(): Promise<void> {
 
     let secondaryOp = await smartAccount.createUserOperation(
         [{ to: nftContractAddress, value: 0n, data: mintCallData }],
-        nodeUrl, bundlerUrl, { nonce: nonceAfterRegister },
+        nodeUrl, bundlerUrl,
     )
     const { userOperation: sponsoredSecondaryOp } = await paymaster.createPaymasterUserOperation(
         smartAccount, secondaryOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
@@ -161,11 +154,7 @@ async function main(): Promise<void> {
 
     const secondaryResponse = await smartAccount.sendUserOperation(secondaryOp, bundlerUrl)
     const secondaryReceipt = await secondaryResponse.included()
-    // Wait until the node has seen this UserOperation, and build the next one on
-    // the nonce observed here instead of reading it again from a lagging node.
-    const nonceAfterSecondary = secondaryReceipt
-        ? await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, secondaryOp.nonce)
-        : undefined
+    await waitForNonceAfter(nodeUrl, smartAccount, secondaryOp.nonce) // let the RPC catch up before the next op
 
     if (secondaryReceipt == null) {
         console.log("Receipt not found (timeout)")
@@ -184,15 +173,16 @@ async function main(): Promise<void> {
     // update() will be rejected with OnlyAdminCanSelfCall.
     console.log("\nUpdating key expiration to 1 year...")
 
-    // Extend to 1 year from now
-    const newExpiration = Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60
     const updateTx = Calibur7702Account.createUpdateKeySettingsMetaTransaction(
         newKeyHash,
-        { expiration: newExpiration },
+        {
+            // Extend to 1 year from now
+            expiration: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
+        }
     )
 
     let updateOp = await smartAccount.createUserOperation(
-        [updateTx], nodeUrl, bundlerUrl, { nonce: nonceAfterSecondary },
+        [updateTx], nodeUrl, bundlerUrl,
     )
     const { userOperation: sponsoredUpdateOp } = await paymaster.createPaymasterUserOperation(
         smartAccount, updateOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
@@ -204,20 +194,13 @@ async function main(): Promise<void> {
 
     const updateResponse = await smartAccount.sendUserOperation(updateOp, bundlerUrl)
     const updateReceipt = await updateResponse.included()
-    // Wait until the node has seen this UserOperation, and build the next one on
-    // the nonce observed here instead of reading it again from a lagging node.
-    const nonceAfterUpdate = updateReceipt
-        ? await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, updateOp.nonce)
-        : undefined
+    await waitForNonceAfter(nodeUrl, smartAccount, updateOp.nonce) // let the RPC catch up before the next op
 
     if (updateReceipt == null) {
         console.log("Receipt not found (timeout)")
         return
     } else if (updateReceipt.success) {
-        const updatedSettings = await waitForState(
-            () => smartAccount.getKeySettings(nodeUrl, newKeyHash),
-            (settings) => settings.expiration === newExpiration,
-        )
+        const updatedSettings = await smartAccount.getKeySettings(nodeUrl, newKeyHash)
         console.log("Expiration updated to:", new Date(updatedSettings.expiration * 1000).toISOString())
         console.log("Tx:", updateReceipt.receipt.transactionHash)
     } else {
@@ -234,7 +217,7 @@ async function main(): Promise<void> {
     const revokeTx = Calibur7702Account.createRevokeKeyMetaTransaction(newKeyHash)
 
     let revokeOp = await smartAccount.createUserOperation(
-        [revokeTx], nodeUrl, bundlerUrl, { nonce: nonceAfterUpdate },
+        [revokeTx], nodeUrl, bundlerUrl,
     )
     const { userOperation: sponsoredRevokeOp } = await paymaster.createPaymasterUserOperation(
         smartAccount, revokeOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
@@ -251,9 +234,7 @@ async function main(): Promise<void> {
         console.log("Receipt not found (timeout)")
         return
     } else if (revokeReceipt.success) {
-        const stillRegistered = await waitForState(
-            () => smartAccount.isKeyRegistered(nodeUrl, newKeyHash), (registered) => !registered,
-        )
+        const stillRegistered = await smartAccount.isKeyRegistered(nodeUrl, newKeyHash)
         console.log("Key still registered:", stillRegistered) // false
         console.log("Tx:", revokeReceipt.receipt.transactionHash)
     } else {
