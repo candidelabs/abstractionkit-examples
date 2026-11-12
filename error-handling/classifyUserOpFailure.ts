@@ -82,11 +82,18 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
         if (!receipt.success) {
             const reason = `success=false tx=${receipt.receipt.transactionHash}`
             const revert = decodeUserOperationRevertReason(receipt)
-            // Since abstractionkit 2.0.0 these two are reported separately instead
-            // of being folded into outOfGas (EntryPoint v0.7+).
+            // Since abstractionkit 2.0.0 the decoder reports these two (EntryPoint
+            // v0.7+). The prefund is what the gas limits reserved up front, so a
+            // shortfall means the limits were too low, not that the account is short.
             if (revert.prefundTooLow) {
-                return toFailure(['insufficient-account-funds', true,
-                    'The prefund did not cover the actual gas cost. Re-estimate gas (or fund the account) and send a new op.'], reason)
+                return toFailure(['gas-limit-too-low', true,
+                    'The prefund reserved by the gas limits did not cover the actual gas cost. Re-estimate gas and send a new op (this one mined, so its nonce is used).'], reason)
+            }
+            // A postOp that left no revert data also sets outOfGas: the paymaster's
+            // postOp ran out of gas, which a higher postOp gas limit can fix.
+            if (revert.postOpReverted && revert.outOfGas) {
+                return toFailure(['execution-reverted', true,
+                    "The paymaster's postOp ran out of gas. Check or increase paymasterPostOpGasLimit (request fresh paymaster data) and send a new op."], reason)
             }
             if (revert.postOpReverted) {
                 const detail = revert.errorMessage ? `: ${revert.errorMessage}` : ''

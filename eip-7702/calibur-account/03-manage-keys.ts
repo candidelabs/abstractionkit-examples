@@ -109,8 +109,11 @@ async function main(): Promise<void> {
     console.log("Sending registration UserOp...")
     const registerResponse = await smartAccount.sendUserOperation(registerOp, bundlerUrl)
     const registerReceipt = await registerResponse.included()
-    // Make sure the next UserOperation is built on this one's nonce, not a stale one.
-    if (registerReceipt) await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, registerOp.nonce)
+    // Wait until the node has seen this UserOperation, and build the next one on
+    // the nonce observed here instead of reading it again from a lagging node.
+    const nonceAfterRegister = registerReceipt
+        ? await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, registerOp.nonce)
+        : undefined
 
     if (registerReceipt == null) {
         console.log("Receipt not found (timeout)")
@@ -146,7 +149,7 @@ async function main(): Promise<void> {
 
     let secondaryOp = await smartAccount.createUserOperation(
         [{ to: nftContractAddress, value: 0n, data: mintCallData }],
-        nodeUrl, bundlerUrl,
+        nodeUrl, bundlerUrl, { nonce: nonceAfterRegister },
     )
     const { userOperation: sponsoredSecondaryOp } = await paymaster.createPaymasterUserOperation(
         smartAccount, secondaryOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
@@ -158,8 +161,11 @@ async function main(): Promise<void> {
 
     const secondaryResponse = await smartAccount.sendUserOperation(secondaryOp, bundlerUrl)
     const secondaryReceipt = await secondaryResponse.included()
-    // Make sure the next UserOperation is built on this one's nonce, not a stale one.
-    if (secondaryReceipt) await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, secondaryOp.nonce)
+    // Wait until the node has seen this UserOperation, and build the next one on
+    // the nonce observed here instead of reading it again from a lagging node.
+    const nonceAfterSecondary = secondaryReceipt
+        ? await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, secondaryOp.nonce)
+        : undefined
 
     if (secondaryReceipt == null) {
         console.log("Receipt not found (timeout)")
@@ -186,7 +192,7 @@ async function main(): Promise<void> {
     )
 
     let updateOp = await smartAccount.createUserOperation(
-        [updateTx], nodeUrl, bundlerUrl,
+        [updateTx], nodeUrl, bundlerUrl, { nonce: nonceAfterSecondary },
     )
     const { userOperation: sponsoredUpdateOp } = await paymaster.createPaymasterUserOperation(
         smartAccount, updateOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,
@@ -198,8 +204,11 @@ async function main(): Promise<void> {
 
     const updateResponse = await smartAccount.sendUserOperation(updateOp, bundlerUrl)
     const updateReceipt = await updateResponse.included()
-    // Make sure the next UserOperation is built on this one's nonce, not a stale one.
-    if (updateReceipt) await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, updateOp.nonce)
+    // Wait until the node has seen this UserOperation, and build the next one on
+    // the nonce observed here instead of reading it again from a lagging node.
+    const nonceAfterUpdate = updateReceipt
+        ? await waitForNonceAfter(nodeUrl, smartAccount.entrypointAddress, smartAccount.accountAddress, updateOp.nonce)
+        : undefined
 
     if (updateReceipt == null) {
         console.log("Receipt not found (timeout)")
@@ -225,7 +234,7 @@ async function main(): Promise<void> {
     const revokeTx = Calibur7702Account.createRevokeKeyMetaTransaction(newKeyHash)
 
     let revokeOp = await smartAccount.createUserOperation(
-        [revokeTx], nodeUrl, bundlerUrl,
+        [revokeTx], nodeUrl, bundlerUrl, { nonce: nonceAfterUpdate },
     )
     const { userOperation: sponsoredRevokeOp } = await paymaster.createPaymasterUserOperation(
         smartAccount, revokeOp, bundlerUrl, sponsorshipPolicyId ? { sponsorshipPolicyId } : undefined,

@@ -110,7 +110,10 @@ entry), and returns the reason: a string for `revert("...")`, a panic code for
 `outOfGas: true`). Since abstractionkit 2.0.0 it also reads the EntryPoint's
 `PostOpRevertReason` and `UserOperationPrefundTooLow` logs (v0.7+) and reports them
 as `postOpReverted` (a paymaster `postOp` revert, decoded into `errorMessage`) and
-`prefundTooLow`, instead of calling either one out-of-gas. For certainty about out-of-gas, trace the bundle transaction with
+`prefundTooLow` (the gas limits reserved too little). A `postOp` that left no
+revert data sets `outOfGas` too: the paymaster's postOp ran out of gas, so the
+classifier treats it as retriable and points at `paymasterPostOpGasLimit` rather
+than `callGasLimit`. For certainty about out-of-gas, trace the bundle transaction with
 `debug_traceTransaction` or Tenderly, which is a one-off debugging step rather than
 a per-transaction call.
 

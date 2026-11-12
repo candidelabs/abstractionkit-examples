@@ -20,7 +20,9 @@
 | v1.1.0 (default) | `0x000000005c84F8Fd50b21CAC312528A64437030e` | `0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108` (v0.8) |
 | v1.0.0 (legacy) | `0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00` | `0x4337084D9E255Ff0702461CF8895CE9E3b5Ff108` (v0.8) |
 
-Since abstractionkit 1.0.0 the default delegatee is Calibur v1.1.0 (`CALIBUR_UNISWAP_V1_1_0_SINGLETON_ADDRESS`). It keeps the v1.0.0 storage layout, so registered keys survive re-delegation. The examples re-delegate an EOA still on v1.0.0 automatically; to keep using v1.0.0, pass `{ delegateeAddress: "0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00" }` to the constructor.
+v1.1.0 is not deployed on every chain (for example, not on Polygon Amoy at the time of writing). Before using it, check that the delegatee has code on your target chain (`eth_getCode`); delegating to an address without code fails validation with `AA23 reverted: no revert data`. If v1.1.0 is not deployed there, use v1.0.0.
+
+Since abstractionkit 1.0.0 the default delegatee is Calibur v1.1.0 (`CALIBUR_UNISWAP_V1_1_0_SINGLETON_ADDRESS`). It keeps v1.0.0's EIP-712 domain and storage layout, so registered keys survive re-delegation. Every selector abstractionkit calls is unchanged (`executeUserOp`, `register`, `update`, `revoke`, `invalidateNonce`, `isRegistered`, `getKey`, `getKeySettings`, `keyCount`, `keyAt`), but v1.1.0 removes `multicall(bytes[])`; batch through `executeUserOp` instead. The examples re-delegate an EOA still on v1.0.0 automatically; to keep using v1.0.0, pass `{ delegateeAddress: "0x000000009B1D0aF20D8C6d0A44e162d11F9b8f00" }` to the constructor.
 
 ## Key Types
 

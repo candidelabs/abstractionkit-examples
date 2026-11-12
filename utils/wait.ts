@@ -48,5 +48,13 @@ export async function waitForNonceAfter(
 ): Promise<bigint> {
     // A 4337 nonce is (key << 64) | sequence; read the sequence for the same key.
     const key = usedNonce >> 64n
-    return waitForState(() => fetchAccountNonce(nodeUrl, entryPoint, sender, key), (nonce) => nonce > usedNonce)
+    const nonce = await waitForState(
+        () => fetchAccountNonce(nodeUrl, entryPoint, sender, key), (current) => current > usedNonce,
+    )
+    // Building the next UserOperation on a stale nonce would only fail later with
+    // AA25, so stop here with a clear error instead.
+    if (nonce <= usedNonce) {
+        throw new Error(`Account nonce did not advance past ${usedNonce} (node still reports ${nonce}).`)
+    }
+    return nonce
 }

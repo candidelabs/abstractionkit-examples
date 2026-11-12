@@ -130,8 +130,8 @@ Since abstractionkit 2.0.0 the paymaster clients name who failed: a paymaster
 rejection during gas estimation (`AA3x`, `AA50`) throws `PAYMASTER_ERROR` with the
 bundler's `aaCode` copied onto it; any other estimation failure (e.g. `AA23`) stays
 `BUNDLER_ERROR`. Branch on `err.aaCode` for the specific cause. The decoder also
-reports `postOpReverted` (paymaster `postOp` revert) and `prefundTooLow` instead of
-folding them into `outOfGas`, and `response.included()` keeps polling through a
+reports `postOpReverted` (paymaster `postOp` revert; with `outOfGas` also set, the
+postOp ran out of gas) and `prefundTooLow` (gas limits reserved too little), and `response.included()` keeps polling through a
 transient failure (it becomes the `cause` of the eventual `TIMEOUT`).
 
 ### "AA21 didn't pay prefund"
