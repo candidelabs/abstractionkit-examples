@@ -80,7 +80,7 @@ npx ts-node <folder>/<script>.ts
 
 ## Bring Your Own Signer
 
-New in abstractionkit v0.3.2: the `ExternalSigner` API lets you plug viem, ethers, hardware wallets, HSMs, MPC services, or any custom signer into AbstractionKit without passing raw private keys to the SDK. The `signer/` folder has one self-contained example per adapter so you only pull in the signing library you actually use.
+The `ExternalSigner` API lets you plug viem, ethers, hardware wallets, HSMs, MPC services, or any custom signer into AbstractionKit without passing raw private keys to the SDK. The `signer/` folder has one self-contained example per adapter so you only pull in the signing library you actually use.
 
 | Goal | Folder | Key File |
 |------|--------|----------|
@@ -119,20 +119,21 @@ For production endpoints: https://dashboard.candide.dev
 
 ## Common Errors & Solutions
 
-To handle failures in code rather than by eye, see `error-handling/`. Since
-abstractionkit 0.4.0 the SDK does the parsing for you: a thrown
+To handle failures in code rather than by eye, see `error-handling/`. The SDK
+does the parsing for you: a thrown
 `AbstractionKitError` carries the EntryPoint code as `err.aaCode` (e.g. `"AA21"`;
 `parseAaCode(message)` is exported for errors from other sources), and
 `decodeUserOperationRevertReason(receipt)` decodes a mined-but-failed op's revert
 reason from the receipt with no extra RPC call.
 
-Since abstractionkit 2.0.0 the paymaster clients name who failed: a paymaster
+The paymaster clients name who failed: a paymaster
 rejection during gas estimation (`AA3x`, `AA50`) throws `PAYMASTER_ERROR` with the
 bundler's `aaCode` copied onto it; any other estimation failure (e.g. `AA23`) stays
 `BUNDLER_ERROR`. Branch on `err.aaCode` for the specific cause. The decoder also
 reports `postOpReverted` (paymaster `postOp` revert; with `outOfGas` also set, the
-postOp ran out of gas) and `prefundTooLow` (gas limits reserved too little), and `response.included()` keeps polling through a
-transient failure (it becomes the `cause` of the eventual `TIMEOUT`).
+postOp ran out of gas) and `prefundTooLow` (gas limits reserved too little), and
+`response.included()` keeps polling through a transient failure (it becomes the
+`cause` of the eventual `TIMEOUT`).
 
 ### "AA21 didn't pay prefund"
 Account has insufficient ETH and no paymaster is sponsoring.
@@ -162,7 +163,7 @@ Signature doesn't match expected signer(s).
 - Check the paymaster supports the target chain
 - For token paymaster: ensure account has enough tokens
 
-## External Signer (v0.3.2+)
+## External Signer
 
 Use `signUserOperationWithSigners` (Safe, multi-signer array) or `signUserOperationWithSigner` (Simple7702 / Calibur, single signer) with an `ExternalSigner` to avoid passing raw private keys into the SDK.
 
@@ -174,7 +175,7 @@ Three built-in adapters cover the common cases:
 | `fromEthersWallet(wallet)` | Any `ethers.Wallet` / `HDNodeWallet` |
 | `fromViemWalletClient(client)` | `viem` `WalletClient` (typed-data only; no multi-op) |
 
-For HSM / MPC / hardware wallets, pass an inline object matching `ExternalSigner`: `{ address, signHash?(hash), signTypedData?(data) }`, where each function returns the hex signature or a Promise of it (sync returns allowed since 0.4.0). At least one of `signHash` or `signTypedData` is required (compile-time check).
+For HSM / MPC / hardware wallets, pass an inline object matching `ExternalSigner`: `{ address, signHash?(hash), signTypedData?(data) }`, where each function returns the hex signature or a Promise of it (sync returns are allowed). At least one of `signHash` or `signTypedData` is required (compile-time check).
 
 If all you have is a raw 0x-hex private key, the shortest path is the legacy sync API: `safe.signUserOperation(userOp, [privateKey], chainId)`. A `fromPrivateKey(pk)` adapter is also exported for multi-owner setups where pk and HSM owners need to flow through the same async interface.
 
@@ -219,9 +220,8 @@ const response = await smartAccount.sendUserOperation(userOp, bundlerUrl);
 const receipt = await response.included();
 ```
 
-Since abstractionkit 0.4.0, `receipt.logs` (and `receipt.receipt.logs`) are
-structured `Log[]` arrays — do not `JSON.parse` them (they were JSON-encoded
-strings in 0.3.x and earlier).
+`receipt.logs` (and `receipt.receipt.logs`) are structured `Log[]` arrays — do
+not `JSON.parse` them.
 
 ## Account Types
 

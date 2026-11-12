@@ -82,9 +82,9 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
         if (!receipt.success) {
             const reason = `success=false tx=${receipt.receipt.transactionHash}`
             const revert = decodeUserOperationRevertReason(receipt)
-            // Since abstractionkit 2.0.0 the decoder reports these two (EntryPoint
-            // v0.7+). The prefund is what the gas limits reserved up front, so a
-            // shortfall means the limits were too low, not that the account is short.
+            // The decoder reports these two on EntryPoint v0.7+. The prefund is what
+            // the gas limits reserved up front, so a shortfall means the limits were
+            // too low, not that the account is short.
             if (revert.prefundTooLow) {
                 return toFailure(['gas-limit-too-low', true,
                     'The prefund reserved by the gas limits did not cover the actual gas cost. Re-estimate gas and send a new op (this one mined, so its nonce is used).'], reason)
@@ -112,8 +112,8 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
 
     // A thrown AbstractionKitError (or anything else).
     const err = input as { code?: string; aaCode?: string; cause?: { code?: unknown; message?: string }; message?: string } | undefined
-    // A TIMEOUT's cause (since 2.0.0) is the last failed receipt poll, not the
-    // reason, so keep its own message.
+    // A TIMEOUT's cause is the last failed receipt poll, not the reason, so keep
+    // its own message.
     const reason = (err?.code === 'TIMEOUT' ? err.message : err?.cause?.message ?? err?.message) ?? String(input)
     const lower = reason.toLowerCase()
 
@@ -147,15 +147,15 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
     }
 
     // A token paymaster that rejects the op for the account's token balance or
-    // allowance. Since abstractionkit 2.0.0 a paymaster rejection during gas
-    // estimation is a PAYMASTER_ERROR that also carries the bundler's AA3x code,
-    // so check the token wording before the AAxx table maps AA33 to a denial.
+    // allowance. A paymaster rejection during gas estimation is a PAYMASTER_ERROR
+    // that also carries the bundler's AA3x code, so check the token wording before
+    // the AAxx table maps AA33 to a denial.
     if (err?.code === 'PAYMASTER_ERROR' && hasAny(lower, ['token', 'allowance', 'balance'])) {
         return toFailure(['insufficient-token-funds', true, 'Fund the account with more of the gas token and retry.'], reason, err.aaCode)
     }
 
     // EntryPoint AAxx revert code. Thrown AbstractionKitErrors carry it parsed
-    // on `aaCode` (since 0.4.0); parseAaCode() covers errors from other sources.
+    // on `aaCode`; parseAaCode() covers errors from other sources.
     const aaCode = err?.aaCode ?? parseAaCode(reason)
     if (aaCode && AA_CODES[aaCode]) return toFailure(AA_CODES[aaCode], reason, aaCode)
 

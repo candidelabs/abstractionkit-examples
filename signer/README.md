@@ -1,6 +1,6 @@
 # External Signer
 
-The capability-oriented signer API (abstractionkit v0.3.2+) lets you plug
+The capability-oriented signer API lets you plug
 any signing source into AbstractionKit without handing raw private keys
 to the SDK.
 
