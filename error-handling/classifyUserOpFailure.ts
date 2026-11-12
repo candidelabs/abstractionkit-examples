@@ -34,6 +34,7 @@ const AA_CODES: Record<string, Verdict> = {
     AA24: ['signature', false, 'Invalid signature. Re-sign with the correct key.'],
     AA31: ['sponsorship-denied', false, 'Paymaster deposit too low. Use a different paymaster or pay gas yourself.'],
     AA33: ['sponsorship-denied', false, 'Paymaster validation failed. Check the paymaster or pay gas another way.'],
+    AA50: ['sponsorship-denied', false, "The paymaster's postOp reverted. For a token paymaster, check the token balance and allowance; otherwise pay gas another way."],
     AA40: ['gas-limit-too-low', true, 'Verification used more gas than its limit. Re-estimate gas and retry.'],
     AA41: ['gas-limit-too-low', true, 'verificationGasLimit was too low. Re-estimate gas and retry.'],
     AA13: ['gas-limit-too-low', true, 'Account deployment failed (factory reverted or ran out of gas). Re-estimate gas and retry; if it persists, the factory rejected the inputs.'],
@@ -81,6 +82,24 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
         if (!receipt.success) {
             const reason = `success=false tx=${receipt.receipt.transactionHash}`
             const revert = decodeUserOperationRevertReason(receipt)
+            // The decoder reports these two on EntryPoint v0.7+. The prefund is what
+            // the gas limits reserved up front, so a shortfall means the limits were
+            // too low, not that the account is short.
+            if (revert.prefundTooLow) {
+                return toFailure(['gas-limit-too-low', true,
+                    'The prefund reserved by the gas limits did not cover the actual gas cost. Re-estimate gas and send a new op (this one mined, so its nonce is used).'], reason)
+            }
+            // A postOp that left no revert data also sets outOfGas: the paymaster's
+            // postOp ran out of gas, which a higher postOp gas limit can fix.
+            if (revert.postOpReverted && revert.outOfGas) {
+                return toFailure(['execution-reverted', true,
+                    "The paymaster's postOp ran out of gas. Check or increase paymasterPostOpGasLimit (request fresh paymaster data) and send a new op."], reason)
+            }
+            if (revert.postOpReverted) {
+                const detail = revert.errorMessage ? `: ${revert.errorMessage}` : ''
+                return toFailure(['execution-reverted', false,
+                    `The paymaster's postOp reverted${detail}, so the call was undone. For a token paymaster, check the token balance and allowance.`], reason)
+            }
             if (revert.outOfGas) {
                 return toFailure(['execution-reverted', true,
                     'Ran out of gas during execution. Raise callGasLimit and send a new op (this one mined, so its nonce is used).'], reason)
@@ -93,7 +112,9 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
 
     // A thrown AbstractionKitError (or anything else).
     const err = input as { code?: string; aaCode?: string; cause?: { code?: unknown; message?: string }; message?: string } | undefined
-    const reason = err?.cause?.message ?? err?.message ?? String(input)
+    // A TIMEOUT's cause is the last failed receipt poll, not the reason, so keep
+    // its own message.
+    const reason = (err?.code === 'TIMEOUT' ? err.message : err?.cause?.message ?? err?.message) ?? String(input)
     const lower = reason.toLowerCase()
 
     // Not a failure but a TIMEOUT: the bundler accepted the op (it has a hash) but
@@ -125,8 +146,19 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
         return toFailure(['execution-reverted', false, REVERT_ACTION], reason)
     }
 
+    // A token paymaster that rejects the op for the account's token balance or
+    // allowance. A paymaster rejection during gas estimation is a PAYMASTER_ERROR
+    // that also carries the bundler's AA3x code, so check the token wording before
+    // the AAxx table maps AA33 to a denial. That error repeats the bundler's reason
+    // in its own message (its cause only says the estimation call failed), so test
+    // the outer message too.
+    if (err?.code === 'PAYMASTER_ERROR'
+        && hasAny(`${err.message ?? ''} ${lower}`.toLowerCase(), ['token', 'allowance', 'balance'])) {
+        return toFailure(['insufficient-token-funds', true, 'Fund the account with more of the gas token and retry.'], reason, err.aaCode)
+    }
+
     // EntryPoint AAxx revert code. Thrown AbstractionKitErrors carry it parsed
-    // on `aaCode` (since 0.4.0); parseAaCode() covers errors from other sources.
+    // on `aaCode`; parseAaCode() covers errors from other sources.
     const aaCode = err?.aaCode ?? parseAaCode(reason)
     if (aaCode && AA_CODES[aaCode]) return toFailure(AA_CODES[aaCode], reason, aaCode)
 
@@ -135,11 +167,9 @@ export function classifyUserOpFailure(input: unknown): UserOpFailure {
         if (hasAny(lower, rule.keywords)) return toFailure(rule.verdict, reason)
     }
 
-    // Paymaster failures: token vs sponsor (both share the generic -32003).
+    // Any other paymaster failure (denied policy, unsupported EntryPoint, ...).
+    // Token-balance rejections were caught above.
     if (err?.code === 'PAYMASTER_ERROR') {
-        if (hasAny(lower, ['token', 'allowance', 'balance'])) {
-            return toFailure(['insufficient-token-funds', true, 'Fund the account with more of the gas token and retry.'], reason)
-        }
         return toFailure(['sponsorship-denied', false, 'Sponsorship was denied. Check the policy or pay gas another way.'], reason)
     }
 

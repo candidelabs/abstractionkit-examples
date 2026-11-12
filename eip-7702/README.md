@@ -18,7 +18,7 @@ eip-7702/
     ├── 01-upgrade-eoa.ts
     ├── 02-passkeys.ts
     ├── 03-manage-keys.ts
-    └── 04-external-signer.ts        # Calibur with the v0.3.2 ExternalSigner API
+    └── 04-external-signer.ts        # Calibur with the ExternalSigner API
 ```
 
 ## Simple7702Account
@@ -63,7 +63,7 @@ userOperation.eip7702Auth = createAndSignEip7702DelegationAuthorization(
 
 ### UserOperation Signing with an External Signer
 
-Starting in abstractionkit v0.3.2, `signUserOperationWithSigner` accepts any
+`signUserOperationWithSigner` accepts any
 `ExternalSigner` so you don't have to pass a raw private key into the SDK.
 Simple7702 and Calibur validate via raw hash signing, so the signer must
 implement `signHash`. Use one of the hash-capable adapters (`fromViem`,

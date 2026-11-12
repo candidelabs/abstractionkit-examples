@@ -27,6 +27,7 @@
  */
 
 import { loadEnv, getOrCreateOwner } from '../../utils/env'
+import { waitForNonceAfter } from '../../utils/wait'
 import { generatePrivateKey, privateKeyToAddress } from 'viem/accounts'
 import {
     Calibur7702Account,
@@ -113,6 +114,7 @@ async function main(): Promise<void> {
         console.log("Receipt not found (timeout)")
         return
     } else if (registerReceipt.success) {
+        await waitForNonceAfter(nodeUrl, smartAccount, registerOp.nonce) // let the RPC catch up before the next op
         console.log("Key registered! Tx:", registerReceipt.receipt.transactionHash)
     } else {
         console.log("Registration failed:", registerReceipt)
@@ -157,6 +159,7 @@ async function main(): Promise<void> {
         console.log("Receipt not found (timeout)")
         return
     } else if (secondaryReceipt.success) {
+        await waitForNonceAfter(nodeUrl, smartAccount, secondaryOp.nonce) // let the RPC catch up before the next op
         console.log("Transaction signed by secondary key! Tx:", secondaryReceipt.receipt.transactionHash)
     } else {
         console.log("Transaction failed:", secondaryReceipt)
@@ -196,6 +199,7 @@ async function main(): Promise<void> {
         console.log("Receipt not found (timeout)")
         return
     } else if (updateReceipt.success) {
+        await waitForNonceAfter(nodeUrl, smartAccount, updateOp.nonce) // let the RPC catch up before the next op
         const updatedSettings = await smartAccount.getKeySettings(nodeUrl, newKeyHash)
         console.log("Expiration updated to:", new Date(updatedSettings.expiration * 1000).toISOString())
         console.log("Tx:", updateReceipt.receipt.transactionHash)
@@ -230,6 +234,7 @@ async function main(): Promise<void> {
         console.log("Receipt not found (timeout)")
         return
     } else if (revokeReceipt.success) {
+        await waitForNonceAfter(nodeUrl, smartAccount, revokeOp.nonce) // let the RPC catch up before reading
         const stillRegistered = await smartAccount.isKeyRegistered(nodeUrl, newKeyHash)
         console.log("Key still registered:", stillRegistered) // false
         console.log("Tx:", revokeReceipt.receipt.transactionHash)

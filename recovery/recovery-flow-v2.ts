@@ -20,6 +20,7 @@
  */
 
 import { loadEnv, getOrCreateOwner } from '../utils/env'
+import { waitForNonceAfter } from '../utils/wait'
 import {
     SafeMultiChainSigAccountV1 as SafeAccount,
     Erc7677Paymaster,
@@ -60,6 +61,7 @@ async function main(): Promise<void> {
             throw new Error("Useroperation execution failed. Tx: " + receipt.receipt.transactionHash)
         }
         console.log("  Included. The transaction hash is : " + receipt.receipt.transactionHash)
+        await waitForNonceAfter(nodeUrl, account, userOperation.nonce) // let the RPC catch up before the next step
     }
 
     // The guardian is a plain EOA. It only signs, so it needs no funds.

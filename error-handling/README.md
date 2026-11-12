@@ -7,8 +7,8 @@ Two helpers do the work:
 
 - `classifyUserOpFailure(errorOrReceipt)` (in this folder) turns a failure into an
   actionable verdict: `{ category, isRetriable, suggestedAction, aaCode?, reason }`.
-- `decodeUserOperationRevertReason(receipt)` (exported by abstractionkit since
-  0.4.0) reads the on-chain revert reason out of a mined-but-failed receipt.
+- `decodeUserOperationRevertReason(receipt)` (exported by abstractionkit) reads
+  the on-chain revert reason out of a mined-but-failed receipt.
 
 Each of the five scripts triggers one real failure on a live testnet and runs it
 through the classifier.
@@ -91,10 +91,13 @@ The classifier trusts codes before wording, because codes are stable and message
 are not: the error `code` (`BUNDLER_ERROR` vs `PAYMASTER_ERROR`) and `cause.code`
 first, then the EntryPoint `AAxx` code, and only then keyword matching for the two
 cases no code pins down (token vs sponsor, both `-32003`; fee and gas-limit errors,
-`-32602`). Since abstractionkit 0.4.0 the `AAxx` code arrives pre-parsed on a thrown
-`AbstractionKitError` as `err.aaCode`, with the exported `parseAaCode(message)` as a
-fallback for errors from other sources. Those keyword strings are tuned for Candide,
-so swap them for another provider.
+`-32602`). The `AAxx` code arrives pre-parsed on a thrown `AbstractionKitError` as
+`err.aaCode`, with the exported `parseAaCode(message)` as a fallback for errors from
+other sources. The paymaster clients name who failed: a paymaster rejection during
+gas estimation (`AA3x`, `AA50`) is a `PAYMASTER_ERROR` that still carries the
+bundler's `aaCode`, while any other estimation failure (e.g. `AA23`) stays a
+`BUNDLER_ERROR`. Those keyword strings are tuned for Candide, so swap them for
+another provider.
 
 ## Out-of-gas vs revert
 
@@ -104,7 +107,13 @@ on purpose. abstractionkit's `decodeUserOperationRevertReason` reads the EntryPo
 call, matches the receipt's `userOpHash` (so multi-op bundles return the right
 entry), and returns the reason: a string for `revert("...")`, a panic code for
 `assert`, or empty data, which usually means out-of-gas (so it reports
-`outOfGas: true`). For certainty about out-of-gas, trace the bundle transaction with
+`outOfGas: true`). It also reads the EntryPoint's
+`PostOpRevertReason` and `UserOperationPrefundTooLow` logs (v0.7+) and reports them
+as `postOpReverted` (a paymaster `postOp` revert, decoded into `errorMessage`) and
+`prefundTooLow` (the gas limits reserved too little). A `postOp` that left no
+revert data sets `outOfGas` too: the paymaster's postOp ran out of gas, so the
+classifier treats it as retriable and points at `paymasterPostOpGasLimit` rather
+than `callGasLimit`. For certainty about out-of-gas, trace the bundle transaction with
 `debug_traceTransaction` or Tenderly, which is a one-off debugging step rather than
 a per-transaction call.
 
