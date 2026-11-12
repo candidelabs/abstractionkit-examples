@@ -30,8 +30,11 @@ import {
 //   After these land, the Safe validates/executes through the new module on the
 //   new EntryPoint. The Safe singleton (master copy) does NOT change.
 //
-//   The SDK composes this exact batch for you (renamed in abstractionkit 1.0.0):
+//   The SDK composes this exact batch for you:
 //   oldAccount.createMigrateToSafeMultiChainSigAccountMetaTransactions(nodeUrl).
+//   abstractionkit 0.4.0 introduced it as
+//   createMigrateToSafeMultiChainSigAccountV1MetaTransactions; v1.0.0 renamed
+//   it to the unsuffixed name and kept the old one as a deprecated alias.
 //
 // STORAGE CLEARING — none required.
 //   Both Safe4337Module (v0.7) and Safe4337MultiChainSignatureModule (v0.9) are

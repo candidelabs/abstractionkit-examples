@@ -55,7 +55,8 @@ npx ts-node <folder>/<script>.ts
 | Multi-owner wallet | `multisig/` | `multisig.ts` |
 | Pay gas with ERC-20 | `pay-gas-in-erc20/` | `pay-gas-in-erc20.ts` |
 | Batch multiple txs | `batch-transactions/` | `batch-transactions.ts` |
-| Account recovery | `recovery/` | `recovery.ts` |
+| Account recovery (add a guardian, Social Recovery Module v0.2.0) | `recovery/` | `recovery.ts` |
+| Full recovery flow: guardian signs, relayer confirms, finalize after grace period (v0.2.0) | `recovery/` | `recovery-flow-v2.ts` |
 | Upgrade a deployed Safe EntryPoint v0.7 → v0.9 (swap 4337 module + fallback handler, sponsored) | `migrate-safe-v07-to-v09/` | `migrate-safe-v07-to-v09.ts` |
 | EIP-7702 delegation (EntryPoint v0.9) | `eip-7702/simple-account/` | `01-upgrade-eoa.ts` |
 | EIP-7702 pay gas in ERC-20 | `eip-7702/simple-account/` | `02-upgrade-eoa-erc20-gas.ts` |
