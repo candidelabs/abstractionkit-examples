@@ -146,7 +146,7 @@ function buildAuthenticatorData(
 
   const parts = [rpIdHash, flagsBuf, signCountBuf]
   if (attestedCredentialData) {
-    parts.push(attestedCredentialData)
+    parts.push(Buffer.from(attestedCredentialData))
   }
   return Buffer.concat(parts)
 }
@@ -237,7 +237,7 @@ export class WebAuthnCredentials {
         clientDataJSON: b2ab(Buffer.from(JSON.stringify(clientData))),
         authenticatorData: b2ab(authenticatorData),
         signature: b2ab(derSignature),
-        userHandle: credential.user,
+        userHandle: b2ab(credential.user),
       },
       type: 'public-key',
     }
@@ -259,7 +259,7 @@ export function base64UrlEncode(data: Hex | Uint8Array | ArrayBufferLike): strin
 }
 
 function b2ab(buf: Uint8Array): ArrayBuffer {
-  return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
+  return new Uint8Array(buf).buffer
 }
 
 /**
