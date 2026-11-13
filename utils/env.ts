@@ -58,8 +58,10 @@ export function getOrCreateOwner(): { publicAddress: string; privateKey: string 
 
     const privateKey = generatePrivateKey()
     const account = privateKeyToAccount(privateKey)
-    console.log('No PUBLIC_ADDRESS/PRIVATE_KEY in .env — auto-generated a keypair for this run.')
-    console.log('Owner:', account.address, '\n')
+    console.log('No PUBLIC_ADDRESS/PRIVATE_KEY in .env — generated a test account for this run.')
+    console.log('To reuse it (e.g. to revoke a delegation later), add to .env:')
+    console.log('PUBLIC_ADDRESS=' + account.address)
+    console.log('PRIVATE_KEY=' + privateKey + '   # testnet only\n')
     return { publicAddress: account.address, privateKey }
 }
 
