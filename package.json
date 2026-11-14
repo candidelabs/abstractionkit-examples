@@ -18,7 +18,7 @@
   },
   "devDependencies": {
     "ethers": "^6.16.0",
-    "rimraf": "^5.0.10",
+    "rimraf": "^6.1.4",
     "typescript": "^5.8.3"
   }
 }
